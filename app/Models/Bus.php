@@ -11,19 +11,32 @@ class Bus extends Model
 
     protected $fillable = [
         'bus_number',
-        'operator_name',
+        'operator_id',
         'bus_type_id',
         'license_plate',
+        'model',
+        'color',
         'manufacture_year',
         'total_seats',
+        'seat_layout',
         'amenities',
+        'description',
         'is_active'
     ];
 
     protected $casts = [
+        'seat_layout' => 'array',
         'amenities' => 'array',
         'is_active' => 'boolean'
     ];
+
+    /**
+     * Get the operator that owns the bus.
+     */
+    public function operator()
+    {
+        return $this->belongsTo(User::class, 'operator_id');
+    }
 
     /**
      * Get the bus type that owns the bus.
@@ -54,6 +67,89 @@ class Bus extends Model
      */
     public function getDisplayNameAttribute()
     {
-        return $this->operator_name . ' - ' . $this->bus_number;
+        return $this->operator->company_name . ' - ' . $this->bus_number;
+    }
+
+    /**
+     * Get the full bus name with type.
+     */
+    public function getFullNameAttribute()
+    {
+        return $this->operator->company_name . ' - ' . $this->bus_number . ' (' . $this->busType->name . ')';
+    }
+
+    /**
+     * Scope to get only active buses.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope to filter buses by operator.
+     */
+    public function scopeByOperator($query, $operatorId)
+    {
+        return $query->where('operator_id', $operatorId);
+    }
+
+    /**
+     * Scope to filter buses by bus type.
+     */
+    public function scopeByType($query, $busTypeId)
+    {
+        return $query->where('bus_type_id', $busTypeId);
+    }
+
+    /**
+     * Get available seats count for a specific schedule.
+     */
+    public function getAvailableSeatsForSchedule($scheduleId)
+    {
+        $bookedSeats = $this->seats()
+            ->whereHas('bookings', function($query) use ($scheduleId) {
+                $query->where('schedule_id', $scheduleId)
+                      ->where('status', '!=', 'cancelled');
+            })
+            ->count();
+
+        return $this->total_seats - $bookedSeats;
+    }
+
+    /**
+     * Generate default seat layout based on bus type.
+     */
+    public function generateDefaultSeatLayout()
+    {
+        $busType = $this->busType;
+        if (!$busType || !$busType->seat_layout) {
+            return null;
+        }
+
+        $layout = $busType->seat_layout;
+        $seats = [];
+        $seatNumber = 1;
+
+        for ($row = 1; $row <= $layout['rows']; $row++) {
+            for ($col = 1; $col <= $layout['columns']; $col++) {
+                // Skip aisle position
+                if ($col == $layout['aisle_position']) {
+                    continue;
+                }
+
+                $seats[] = [
+                    'seat_number' => $seatNumber,
+                    'row' => $row,
+                    'column' => $col,
+                    'is_available' => true,
+                    'is_window' => $col == 1 || $col == $layout['columns'],
+                    'is_aisle' => $col == $layout['aisle_position'] - 1 || $col == $layout['aisle_position'] + 1
+                ];
+                $seatNumber++;
+            }
+        }
+
+        return $seats;
     }
 }
