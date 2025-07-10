@@ -54,6 +54,14 @@ Route::middleware(['auth', 'user'])->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'adminDashboard'])->name('dashboard');
 
+    // Operator Management
+    Route::resource('operators', \App\Http\Controllers\Admin\OperatorController::class);
+    Route::patch('operators/{operator}/toggle-status', [\App\Http\Controllers\Admin\OperatorController::class, 'toggleStatus'])->name('operators.toggle-status');
+
+    // User Management
+    Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
+    Route::patch('users/{user}/toggle-status', [\App\Http\Controllers\Admin\UserController::class, 'toggleStatus'])->name('users.toggle-status');
+
     // Bus Management
     Route::resource('buses', \App\Http\Controllers\Admin\BusController::class);
 
