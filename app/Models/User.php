@@ -25,6 +25,10 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'company_name',
+        'company_address',
+        'company_license',
+        'contact_person',
     ];
 
     /**
@@ -60,11 +64,43 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the buses owned by this operator.
+     */
+    public function buses()
+    {
+        return $this->hasMany(Bus::class, 'operator_id');
+    }
+
+    /**
+     * Get the schedules created by this operator.
+     */
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'operator_id');
+    }
+
+    /**
+     * Get bookings for this operator's buses.
+     */
+    public function operatorBookings()
+    {
+        return $this->hasManyThrough(Booking::class, Schedule::class, 'operator_id', 'schedule_id');
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin()
     {
-        return $this->role === 'admin';
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is operator.
+     */
+    public function isOperator()
+    {
+        return $this->hasRole('operator');
     }
 
     /**
@@ -72,6 +108,6 @@ class User extends Authenticatable
      */
     public function isUser()
     {
-        return $this->role === 'user';
+        return $this->hasRole('user');
     }
 }
