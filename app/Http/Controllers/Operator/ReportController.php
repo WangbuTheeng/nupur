@@ -139,9 +139,12 @@ class ReportController extends Controller
         $dateFrom = Carbon::parse($request->date_from);
         $dateTo = Carbon::parse($request->date_to);
 
-        $routeData = Route::where('operator_id', $operator->id)
-            ->with(['schedules' => function($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('travel_date', [$dateFrom, $dateTo])
+        $routeData = Route::whereHas('schedules', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })
+            ->with(['schedules' => function($query) use ($dateFrom, $dateTo, $operator) {
+                $query->where('operator_id', $operator->id)
+                      ->whereBetween('travel_date', [$dateFrom, $dateTo])
                       ->with(['bookings' => function($bookingQuery) {
                           $bookingQuery->where('status', 'confirmed');
                       }]);
@@ -382,7 +385,9 @@ class ReportController extends Controller
     {
         fputcsv($file, ['Route', 'Total Schedules', 'Total Bookings', 'Total Revenue', 'Occupancy Rate %']);
         
-        $routes = Route::where('operator_id', $operator->id)->get();
+        $routes = Route::whereHas('schedules', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->distinct()->get();
         
         foreach ($routes as $route) {
             $schedules = $route->schedules()->whereBetween('travel_date', [$dateFrom, $dateTo])->get();

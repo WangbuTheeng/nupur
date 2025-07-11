@@ -78,10 +78,12 @@ class DashboardController extends Controller
             ->count();
 
         // Get route statistics
-        $totalRoutes = Route::where('operator_id', $operator->id)->count();
-        $activeRoutes = Route::where('operator_id', $operator->id)
-            ->where('is_active', true)
-            ->count();
+        $totalRoutes = Route::whereHas('schedules', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->distinct()->count();
+        $activeRoutes = Route::whereHas('schedules', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->where('is_active', true)->distinct()->count();
 
         return view('dashboard.operator', compact(
             'todayBookings',
@@ -216,13 +218,19 @@ class DashboardController extends Controller
     {
         $operator = Auth::user();
         
-        $routeStats = Route::where('operator_id', $operator->id)
-            ->withCount(['schedules as total_schedules'])
-            ->withCount(['schedules as completed_schedules' => function($query) {
-                $query->where('status', 'completed');
+        $routeStats = Route::whereHas('schedules', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })
+            ->withCount(['schedules as total_schedules' => function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
             }])
-            ->with(['schedules' => function($query) {
-                $query->with('bookings');
+            ->withCount(['schedules as completed_schedules' => function($query) use ($operator) {
+                $query->where('operator_id', $operator->id)
+                      ->where('status', 'completed');
+            }])
+            ->with(['schedules' => function($query) use ($operator) {
+                $query->where('operator_id', $operator->id)
+                      ->with('bookings');
             }])
             ->get()
             ->map(function($route) {

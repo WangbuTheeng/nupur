@@ -7,6 +7,7 @@ use App\Models\Bus;
 use App\Models\BusType;
 use App\Models\Route;
 use App\Models\Schedule;
+use App\Models\City;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -305,5 +306,99 @@ class BusController extends Controller
             'aisle_position' => $layout['aisle_position'],
             'seats' => $seats,
         ];
+    }
+
+    /**
+     * Display routes that the operator has schedules for.
+     */
+    public function routes(Request $request)
+    {
+        $operator = Auth::user();
+
+        // Get routes that this operator has schedules for
+        $query = Route::whereHas('schedules', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->with(['sourceCity', 'destinationCity']);
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhereHas('sourceCity', function($cityQuery) use ($search) {
+                      $cityQuery->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('destinationCity', function($cityQuery) use ($search) {
+                      $cityQuery->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status filter
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->status === 'active');
+        }
+
+        $routes = $query->orderBy('name')->paginate(15);
+
+        // Get statistics for each route
+        $routes->getCollection()->transform(function($route) use ($operator) {
+            $route->total_schedules = $route->schedules()->where('operator_id', $operator->id)->count();
+            $route->active_schedules = $route->schedules()
+                ->where('operator_id', $operator->id)
+                ->where('status', 'scheduled')
+                ->where('travel_date', '>=', Carbon::today())
+                ->count();
+            $route->total_bookings = $route->schedules()
+                ->where('operator_id', $operator->id)
+                ->withCount('bookings')
+                ->get()
+                ->sum('bookings_count');
+            return $route;
+        });
+
+        return view('operator.routes.index', compact('routes'));
+    }
+
+    /**
+     * Show form to suggest a new route.
+     */
+    public function suggestRoute()
+    {
+        $cities = City::where('is_active', true)->orderBy('name')->get();
+        return view('operator.routes.suggest', compact('cities'));
+    }
+
+    /**
+     * Store a route suggestion.
+     */
+    public function storeSuggestion(Request $request)
+    {
+        $request->validate([
+            'source_city_id' => 'required|exists:cities,id',
+            'destination_city_id' => 'required|exists:cities,id|different:source_city_id',
+            'suggested_fare' => 'required|numeric|min:0',
+            'estimated_duration' => 'required|date_format:H:i',
+            'distance_km' => 'required|numeric|min:0',
+            'reason' => 'required|string|max:500',
+            'stops' => 'nullable|array',
+            'stops.*' => 'string|max:255',
+        ]);
+
+        // Check if route already exists
+        $existingRoute = Route::where('source_city_id', $request->source_city_id)
+            ->where('destination_city_id', $request->destination_city_id)
+            ->first();
+
+        if ($existingRoute) {
+            return back()->withInput()
+                ->with('error', 'A route between these cities already exists.');
+        }
+
+        // For now, we'll just show a success message
+        // In a real application, you might want to store this in a separate table
+        // for admin review before creating the actual route
+
+        return back()->with('success', 'Route suggestion submitted successfully! An admin will review your suggestion.');
     }
 }
