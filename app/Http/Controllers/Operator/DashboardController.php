@@ -1,0 +1,298 @@
+<?php
+
+namespace App\Http\Controllers\Operator;
+
+use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Models\Schedule;
+use App\Models\Bus;
+use App\Models\Route;
+use App\Models\Payment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+
+class DashboardController extends Controller
+{
+    /**
+     * Show the operator dashboard.
+     */
+    public function index()
+    {
+        $operator = Auth::user();
+        $today = Carbon::today();
+        
+        // Get today's statistics
+        $todayBookings = Booking::whereHas('schedule', function($query) use ($operator, $today) {
+            $query->where('operator_id', $operator->id)
+                  ->whereDate('travel_date', $today);
+        })->count();
+
+        $todayRevenue = Booking::whereHas('schedule', function($query) use ($operator, $today) {
+            $query->where('operator_id', $operator->id)
+                  ->whereDate('travel_date', $today);
+        })->where('status', 'confirmed')->sum('total_amount');
+
+        $pendingBookings = Booking::whereHas('schedule', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->where('status', 'pending')->count();
+
+        $activeSchedules = Schedule::where('operator_id', $operator->id)
+            ->whereDate('travel_date', $today)
+            ->where('status', 'scheduled')
+            ->count();
+
+        // Get monthly statistics
+        $monthlyBookings = Booking::whereHas('schedule', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->whereMonth('created_at', $today->month)
+          ->whereYear('created_at', $today->year)
+          ->count();
+
+        $monthlyRevenue = Booking::whereHas('schedule', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->whereMonth('created_at', $today->month)
+          ->whereYear('created_at', $today->year)
+          ->where('status', 'confirmed')
+          ->sum('total_amount');
+
+        // Get recent bookings
+        $recentBookings = Booking::whereHas('schedule', function($query) use ($operator) {
+            $query->where('operator_id', $operator->id);
+        })->with(['user', 'schedule.route', 'schedule.bus'])
+          ->orderBy('created_at', 'desc')
+          ->limit(10)
+          ->get();
+
+        // Get today's schedules
+        $todaySchedules = Schedule::where('operator_id', $operator->id)
+            ->whereDate('travel_date', $today)
+            ->with(['route', 'bus', 'bookings'])
+            ->orderBy('departure_time')
+            ->get();
+
+        // Get fleet statistics
+        $totalBuses = Bus::where('operator_id', $operator->id)->count();
+        $activeBuses = Bus::where('operator_id', $operator->id)
+            ->where('status', 'active')
+            ->count();
+
+        // Get route statistics
+        $totalRoutes = Route::where('operator_id', $operator->id)->count();
+        $activeRoutes = Route::where('operator_id', $operator->id)
+            ->where('is_active', true)
+            ->count();
+
+        return view('dashboard.operator', compact(
+            'todayBookings',
+            'todayRevenue',
+            'pendingBookings',
+            'activeSchedules',
+            'monthlyBookings',
+            'monthlyRevenue',
+            'recentBookings',
+            'todaySchedules',
+            'totalBuses',
+            'activeBuses',
+            'totalRoutes',
+            'activeRoutes'
+        ));
+    }
+
+    /**
+     * Get dashboard statistics for AJAX requests.
+     */
+    public function stats()
+    {
+        $operator = Auth::user();
+        $today = Carbon::today();
+        
+        $stats = [
+            'today_bookings' => Booking::whereHas('schedule', function($query) use ($operator, $today) {
+                $query->where('operator_id', $operator->id)
+                      ->whereDate('travel_date', $today);
+            })->count(),
+            
+            'today_revenue' => Booking::whereHas('schedule', function($query) use ($operator, $today) {
+                $query->where('operator_id', $operator->id)
+                      ->whereDate('travel_date', $today);
+            })->where('status', 'confirmed')->sum('total_amount'),
+            
+            'pending_bookings' => Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->where('status', 'pending')->count(),
+            
+            'active_schedules' => Schedule::where('operator_id', $operator->id)
+                ->whereDate('travel_date', $today)
+                ->where('status', 'scheduled')
+                ->count(),
+                
+            'monthly_revenue' => Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->whereMonth('created_at', $today->month)
+              ->whereYear('created_at', $today->year)
+              ->where('status', 'confirmed')
+              ->sum('total_amount'),
+              
+            'total_buses' => Bus::where('operator_id', $operator->id)->count(),
+            'active_buses' => Bus::where('operator_id', $operator->id)
+                ->where('status', 'active')
+                ->count(),
+                
+            'last_updated' => now()->format('H:i:s'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Get booking analytics data.
+     */
+    public function bookingAnalytics()
+    {
+        $operator = Auth::user();
+        $today = Carbon::today();
+        
+        // Get hourly bookings for today
+        $hourlyBookings = [];
+        for ($hour = 0; $hour < 24; $hour++) {
+            $startTime = $today->copy()->addHours($hour);
+            $endTime = $startTime->copy()->addHour();
+            
+            $bookings = Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->whereBetween('created_at', [$startTime, $endTime])->count();
+            
+            $revenue = Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->whereBetween('created_at', [$startTime, $endTime])
+              ->where('status', 'confirmed')
+              ->sum('total_amount');
+            
+            $hourlyBookings[] = [
+                'hour' => $hour,
+                'bookings' => $bookings,
+                'revenue' => $revenue,
+            ];
+        }
+
+        // Get daily bookings for the last 30 days
+        $dailyBookings = [];
+        for ($i = 29; $i >= 0; $i--) {
+            $date = $today->copy()->subDays($i);
+            
+            $bookings = Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->whereDate('created_at', $date)->count();
+            
+            $revenue = Booking::whereHas('schedule', function($query) use ($operator) {
+                $query->where('operator_id', $operator->id);
+            })->whereDate('created_at', $date)
+              ->where('status', 'confirmed')
+              ->sum('total_amount');
+            
+            $dailyBookings[] = [
+                'date' => $date->format('Y-m-d'),
+                'bookings' => $bookings,
+                'revenue' => $revenue,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'hourly_bookings' => $hourlyBookings,
+            'daily_bookings' => $dailyBookings,
+            'last_updated' => now()->format('H:i:s'),
+        ]);
+    }
+
+    /**
+     * Get route performance data.
+     */
+    public function routePerformance()
+    {
+        $operator = Auth::user();
+        
+        $routeStats = Route::where('operator_id', $operator->id)
+            ->withCount(['schedules as total_schedules'])
+            ->withCount(['schedules as completed_schedules' => function($query) {
+                $query->where('status', 'completed');
+            }])
+            ->with(['schedules' => function($query) {
+                $query->with('bookings');
+            }])
+            ->get()
+            ->map(function($route) {
+                $totalBookings = $route->schedules->sum(function($schedule) {
+                    return $schedule->bookings->count();
+                });
+                
+                $totalRevenue = $route->schedules->sum(function($schedule) {
+                    return $schedule->bookings->where('status', 'confirmed')->sum('total_amount');
+                });
+                
+                $averageOccupancy = $route->schedules->avg(function($schedule) {
+                    $totalSeats = $schedule->bus->total_seats ?? 0;
+                    $bookedSeats = $schedule->bookings->where('status', 'confirmed')->sum('passenger_count');
+                    return $totalSeats > 0 ? ($bookedSeats / $totalSeats) * 100 : 0;
+                });
+                
+                return [
+                    'route' => $route,
+                    'total_bookings' => $totalBookings,
+                    'total_revenue' => $totalRevenue,
+                    'average_occupancy' => round($averageOccupancy, 2),
+                    'total_schedules' => $route->total_schedules,
+                    'completed_schedules' => $route->completed_schedules,
+                ];
+            })
+            ->sortByDesc('total_revenue');
+
+        return response()->json([
+            'success' => true,
+            'route_performance' => $routeStats->values(),
+        ]);
+    }
+
+    /**
+     * Get fleet utilization data.
+     */
+    public function fleetUtilization()
+    {
+        $operator = Auth::user();
+        $today = Carbon::today();
+        
+        $busStats = Bus::where('operator_id', $operator->id)
+            ->with(['schedules' => function($query) use ($today) {
+                $query->whereDate('travel_date', $today);
+            }])
+            ->get()
+            ->map(function($bus) use ($today) {
+                $todaySchedules = $bus->schedules->where('travel_date', $today->toDateString())->count();
+                $totalBookings = $bus->schedules->sum(function($schedule) {
+                    return $schedule->bookings->where('status', 'confirmed')->count();
+                });
+                
+                $totalRevenue = $bus->schedules->sum(function($schedule) {
+                    return $schedule->bookings->where('status', 'confirmed')->sum('total_amount');
+                });
+                
+                return [
+                    'bus' => $bus,
+                    'today_schedules' => $todaySchedules,
+                    'total_bookings' => $totalBookings,
+                    'total_revenue' => $totalRevenue,
+                    'utilization_rate' => $todaySchedules > 0 ? 100 : 0, // Simplified calculation
+                ];
+            })
+            ->sortByDesc('total_revenue');
+
+        return response()->json([
+            'success' => true,
+            'fleet_utilization' => $busStats->values(),
+        ]);
+    }
+}

@@ -21,7 +21,8 @@ class Bus extends Model
         'seat_layout',
         'amenities',
         'description',
-        'is_active'
+        'is_active',
+        'status'
     ];
 
     protected $casts = [
@@ -29,6 +30,22 @@ class Bus extends Model
         'amenities' => 'array',
         'is_active' => 'boolean'
     ];
+
+    /**
+     * Scope to get buses by status.
+     */
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope to get buses needing maintenance.
+     */
+    public function scopeNeedsMaintenance($query)
+    {
+        return $query->whereIn('status', ['maintenance', 'inspection']);
+    }
 
     /**
      * Get the operator that owns the bus.
@@ -83,7 +100,7 @@ class Bus extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active', true)->where('status', 'active');
     }
 
     /**

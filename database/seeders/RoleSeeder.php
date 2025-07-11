@@ -17,7 +17,7 @@ class RoleSeeder extends Seeder
         // Create roles
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $operatorRole = Role::firstOrCreate(['name' => 'operator']);
-        $customerRole = Role::firstOrCreate(['name' => 'customer']);
+        $userRole = Role::firstOrCreate(['name' => 'user']);
 
         // Create permissions
         $permissions = [
@@ -36,7 +36,7 @@ class RoleSeeder extends Seeder
             'manage_own_bookings',
             'view_own_analytics',
 
-            // Customer permissions
+            // User permissions
             'search_buses',
             'make_bookings',
             'view_own_bookings',
@@ -65,7 +65,7 @@ class RoleSeeder extends Seeder
             'view_own_analytics',
         ]);
 
-        $customerRole->givePermissionTo([
+        $userRole->givePermissionTo([
             'search_buses',
             'make_bookings',
             'view_own_bookings',

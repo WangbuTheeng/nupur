@@ -11,19 +11,26 @@ class Payment extends Model
 
     protected $fillable = [
         'booking_id',
+        'user_id',
         'payment_method',
         'transaction_id',
+        'gateway_transaction_id',
         'amount',
+        'currency',
         'status',
         'gateway_response',
+        'gateway_data',
         'paid_at',
+        'failed_at',
         'failure_reason'
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'gateway_response' => 'array',
-        'paid_at' => 'datetime'
+        'gateway_data' => 'array',
+        'paid_at' => 'datetime',
+        'failed_at' => 'datetime'
     ];
 
     /**
@@ -32,6 +39,14 @@ class Payment extends Model
     public function booking()
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * Get the user that owns the payment.
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

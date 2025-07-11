@@ -76,6 +76,54 @@ class UserController extends Controller
     }
 
     /**
+     * Show the form for creating a new user.
+     */
+    public function create()
+    {
+        return view('admin.users.create');
+    }
+
+    /**
+     * Store a newly created user in storage.
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'phone' => 'required|string|max:20|unique:users',
+            'password' => 'required|string|min:8|confirmed',
+            'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|in:male,female,other',
+            'address' => 'nullable|string|max:500',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
+            'role' => 'required|in:user,operator,admin',
+            'is_active' => 'boolean',
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
+            'date_of_birth' => $request->date_of_birth,
+            'gender' => $request->gender,
+            'address' => $request->address,
+            'emergency_contact_name' => $request->emergency_contact_name,
+            'emergency_contact_phone' => $request->emergency_contact_phone,
+            'is_active' => $request->boolean('is_active', true),
+            'email_verified_at' => now(), // Auto-verify admin created users
+        ]);
+
+        // Assign role
+        $user->assignRole($request->role);
+
+        return redirect()->route('admin.users.index')
+            ->with('success', 'User created successfully!');
+    }
+
+    /**
      * Display the specified user.
      */
     public function show(User $user)
@@ -83,11 +131,19 @@ class UserController extends Controller
         $user->load(['bookings.schedule.route', 'bookings.schedule.bus']);
         
         // Get user statistics
+        $totalBookings = $user->bookings()->count();
+        $confirmedBookings = $user->bookings()->where('status', 'confirmed')->count();
+        $cancelledBookings = $user->bookings()->where('status', 'cancelled')->count();
+        $pendingBookings = $user->bookings()->where('status', 'pending')->count();
+        $totalSpent = $user->bookings()->where('status', 'confirmed')->sum('total_amount') ?? 0;
+
         $stats = [
-            'total_bookings' => $user->bookings()->count(),
-            'confirmed_bookings' => $user->bookings()->where('status', 'confirmed')->count(),
-            'cancelled_bookings' => $user->bookings()->where('status', 'cancelled')->count(),
-            'total_spent' => $user->bookings()->where('status', 'confirmed')->sum('total_amount'),
+            'total_bookings' => $totalBookings,
+            'confirmed_bookings' => $confirmedBookings,
+            'cancelled_bookings' => $cancelledBookings,
+            'pending_bookings' => $pendingBookings,
+            'total_spent' => $totalSpent,
+            'average_booking' => $confirmedBookings > 0 ? round($totalSpent / $confirmedBookings, 2) : 0,
             'this_month_bookings' => $user->bookings()->whereMonth('created_at', Carbon::now()->month)->count(),
             'last_booking' => $user->bookings()->latest()->first()?->created_at,
         ];
@@ -132,25 +188,36 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'required|string|max:20|unique:users,phone,' . $user->id,
-            'password' => 'nullable|string|min:8|confirmed',
+            'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|in:male,female,other',
+            'address' => 'nullable|string|max:500',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
+            'role' => 'required|in:user,operator,admin',
             'is_active' => 'boolean',
+            'email_verified' => 'boolean',
         ]);
 
-        $updateData = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'is_active' => $request->boolean('is_active'),
-        ];
+        // Update user data
+        $user->update($request->only([
+            'name', 'email', 'phone', 'date_of_birth', 'gender',
+            'address', 'emergency_contact_name', 'emergency_contact_phone'
+        ]));
 
-        if ($request->filled('password')) {
-            $updateData['password'] = Hash::make($request->password);
+        // Update account settings
+        $user->update([
+            'is_active' => $request->boolean('is_active'),
+            'email_verified_at' => $request->boolean('email_verified') ? ($user->email_verified_at ?? now()) : null,
+        ]);
+
+        // Update role if changed
+        $currentRole = $user->roles->first()?->name;
+        if ($currentRole !== $request->role) {
+            $user->syncRoles([$request->role]);
         }
 
-        $user->update($updateData);
-
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User updated successfully.');
+        return redirect()->route('admin.users.show', $user)
+            ->with('success', 'User updated successfully!');
     }
 
     /**
@@ -203,6 +270,24 @@ class UserController extends Controller
     {
         $user->update(['is_active' => true]);
         return back()->with('success', 'User unblocked successfully.');
+    }
+
+    /**
+     * Reset user password.
+     */
+    public function resetPassword(User $user)
+    {
+        // Generate a random password
+        $newPassword = 'BookNGO' . rand(1000, 9999);
+
+        $user->update([
+            'password' => Hash::make($newPassword),
+            'password_changed_at' => now(),
+        ]);
+
+        // In a real application, you would send this password via email
+        // For now, we'll just show it in the success message
+        return back()->with('success', "Password reset successfully. New password: {$newPassword}");
     }
 
     /**

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\Booking;
+use App\Events\SeatUpdated;
+use App\Events\BookingStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -204,6 +206,14 @@ class BookingController extends Controller
 
             // Update available seats
             $schedule->decrement('available_seats', $passengerCount);
+
+            // Fire seat update events for each booked seat
+            foreach ($reservation['seat_numbers'] as $seatNumber) {
+                event(new SeatUpdated($schedule, $seatNumber, 'booked', Auth::id()));
+            }
+
+            // Fire booking status update event
+            event(new BookingStatusUpdated($booking));
 
             // Clear seat reservation
             Cache::forget($reservationKey);

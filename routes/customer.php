@@ -29,10 +29,10 @@ Route::prefix('search')->name('search.')->group(function () {
 
 // Authenticated customer routes
 Route::middleware(['auth', 'user'])->group(function () {
-    
+
     // Customer Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('customer.dashboard');
-    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('customer.dashboard.stats');
+    Route::get('/customer/dashboard', [DashboardController::class, 'index'])->name('customer.dashboard');
+    Route::get('/customer/dashboard/stats', [DashboardController::class, 'stats'])->name('customer.dashboard.stats');
     
     // Booking Process
     Route::prefix('booking')->name('booking.')->group(function () {

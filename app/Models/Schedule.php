@@ -13,6 +13,7 @@ class Schedule extends Model
     protected $fillable = [
         'bus_id',
         'route_id',
+        'operator_id',
         'travel_date',
         'departure_time',
         'arrival_time',
@@ -43,6 +44,14 @@ class Schedule extends Model
     public function route()
     {
         return $this->belongsTo(Route::class);
+    }
+
+    /**
+     * Get the operator that owns the schedule.
+     */
+    public function operator()
+    {
+        return $this->belongsTo(User::class, 'operator_id');
     }
 
     /**
