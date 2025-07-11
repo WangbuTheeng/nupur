@@ -9,101 +9,133 @@
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-    
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    
+
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     @stack('meta')
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body class="font-sans antialiased bg-gray-100">
+<body class="font-sans antialiased bg-gray-50" x-data="{ sidebarOpen: false }"">
     <div class="min-h-screen">
-        <!-- Navigation -->
-        <nav class="bg-white shadow-lg border-b border-gray-200">
+        <!-- Modern Navigation -->
+        <nav class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
-                    <div class="flex">
+                    <div class="flex items-center">
                         <!-- Logo -->
-                        <div class="shrink-0 flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
                             <a href="{{ route('admin.dashboard') }}" class="flex items-center">
-                                <i class="fas fa-bus text-blue-600 text-2xl mr-3"></i>
+                                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-bus text-white text-sm"></i>
+                                </div>
                                 <span class="text-xl font-bold text-gray-900">BookNGO Admin</span>
                             </a>
                         </div>
 
                         <!-- Navigation Links -->
-                        <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                            <a href="{{ route('admin.dashboard') }}" 
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.dashboard') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium leading-5 transition duration-150 ease-in-out">
-                                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                        <div class="hidden md:ml-10 md:flex md:space-x-1">
+                            <a href="{{ route('admin.dashboard') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.dashboard*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-chart-line mr-2 text-sm"></i>
+                                Dashboard
                             </a>
-                            
-                            <a href="{{ route('admin.users.index') }}" 
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.users.*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium leading-5 transition duration-150 ease-in-out">
-                                <i class="fas fa-users mr-2"></i>Users
+
+                            <a href="{{ route('admin.users.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.users.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-users mr-2 text-sm"></i>
+                                Users
                             </a>
-                            
-                            <a href="{{ route('admin.operators.index') }}" 
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.operators.*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium leading-5 transition duration-150 ease-in-out">
-                                <i class="fas fa-building mr-2"></i>Operators
+
+                            <a href="{{ route('admin.operators.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.operators.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-building mr-2 text-sm"></i>
+                                Operators
                             </a>
-                            
-                            <a href="{{ route('admin.bookings.index') }}" 
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.bookings.*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium leading-5 transition duration-150 ease-in-out">
-                                <i class="fas fa-ticket-alt mr-2"></i>Bookings
+
+                            <a href="{{ route('admin.buses.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.buses.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-bus mr-2 text-sm"></i>
+                                Buses
                             </a>
-                            
-                            <a href="{{ route('admin.reports.index') }}" 
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.reports.*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium leading-5 transition duration-150 ease-in-out">
-                                <i class="fas fa-chart-bar mr-2"></i>Reports
+
+                            <a href="{{ route('admin.routes.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.routes.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-route mr-2 text-sm"></i>
+                                Routes
+                            </a>
+
+                            <a href="{{ route('admin.bookings.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.bookings.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-ticket-alt mr-2 text-sm"></i>
+                                Bookings
+                            </a>
+
+                            <a href="{{ route('admin.reports.index') }}"
+                               class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 {{ request()->routeIs('admin.reports.*') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}">
+                                <i class="fas fa-chart-bar mr-2 text-sm"></i>
+                                Reports
                             </a>
                         </div>
                     </div>
 
-                    <!-- Settings Dropdown -->
-                    <div class="hidden sm:flex sm:items-center sm:ml-6">
+                    <!-- Right side -->
+                    <div class="flex items-center space-x-4">
                         <!-- Notifications -->
-                        <button class="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:text-gray-500 transition duration-150 ease-in-out mr-4">
+                        <button class="relative p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition duration-150 ease-in-out">
                             <i class="fas fa-bell text-lg"></i>
+                            <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
                         </button>
 
-                        <div class="ml-3 relative">
-                            <div class="relative inline-block text-left" x-data="{ open: false }">
-                                <div>
-                                    <button @click="open = !open" type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                                        <div class="flex items-center">
-                                            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mr-2">
-                                                <span class="text-white text-sm font-medium">{{ substr(Auth::user()->name, 0, 1) }}</span>
-                                            </div>
-                                            <span>{{ Auth::user()->name }}</span>
-                                        </div>
-                                        <div class="ml-1">
-                                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                            </svg>
-                                        </div>
-                                    </button>
+                        <!-- User Dropdown -->
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" type="button" class="flex items-center space-x-3 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out">
+                                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm font-medium">{{ substr(Auth::user()->name, 0, 1) }}</span>
                                 </div>
+                                <div class="hidden md:block text-left">
+                                    <div class="text-sm font-medium text-gray-900">{{ Auth::user()->name }}</div>
+                                    <div class="text-xs text-gray-500">Admin User</div>
+                                </div>
+                                <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                            </button>
 
-                                <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50" role="menu">
-                                    <div class="py-1" role="none">
-                                        <a href="{{ route('admin.profile.edit') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                                            <i class="fas fa-user mr-2"></i>Profile
-                                        </a>
-                                        <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                                            <i class="fas fa-cog mr-2"></i>Settings
-                                        </a>
-                                        <div class="border-t border-gray-100"></div>
-                                        <form method="POST" action="{{ route('logout') }}">
-                                            @csrf
-                                            <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
-                                                <i class="fas fa-sign-out-alt mr-2"></i>Log Out
-                                            </button>
-                                        </form>
+                            <div x-show="open" @click.away="open = false"
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="transform opacity-0 scale-95"
+                                 x-transition:enter-end="transform opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="transform opacity-100 scale-100"
+                                 x-transition:leave-end="transform opacity-0 scale-95"
+                                 class="origin-top-right absolute right-0 mt-2 w-56 rounded-lg shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                                <div class="py-2">
+                                    <div class="px-4 py-3 border-b border-gray-100">
+                                        <p class="text-sm font-medium text-gray-900">{{ Auth::user()->name }}</p>
+                                        <p class="text-xs text-gray-500">{{ Auth::user()->email }}</p>
                                     </div>
+                                    <a href="{{ route('admin.profile.edit') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition duration-150 ease-in-out">
+                                        <i class="fas fa-user-circle mr-3 text-gray-400"></i>Profile
+                                    </a>
+                                    <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition duration-150 ease-in-out">
+                                        <i class="fas fa-cog mr-3 text-gray-400"></i>Settings
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition duration-150 ease-in-out">
+                                            <i class="fas fa-sign-out-alt mr-3 text-gray-400"></i>Log Out
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </div>

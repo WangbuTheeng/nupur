@@ -18,7 +18,7 @@ Route::get('/dashboard', function () {
     }
 
     if ($user->hasRole('admin')) {
-        return app(DashboardController::class)->adminDashboard();
+        return redirect()->route('admin.dashboard');
     } elseif ($user->hasRole('operator')) {
         return redirect()->route('operator.dashboard');
     } else {

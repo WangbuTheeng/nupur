@@ -1,26 +1,35 @@
 @extends('layouts.admin')
 
-@section('title', 'Admin Dashboard')
+@section('title', 'Real-time Admin Dashboard')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <div class="mb-8">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p class="text-gray-600 mt-2">Welcome back! Here's what's happening with your bus booking system.</p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="text-sm text-gray-500">
-                    Last updated: <span id="last-updated">{{ now()->format('H:i:s') }}</span>
+    <div class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Real-time Admin Dashboard</h1>
+                    <p class="text-gray-600 mt-1">Welcome back! Here's what's happening with BookNGo in real-time.</p>
                 </div>
-                <button onclick="refreshStats()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
-                    <i class="fas fa-sync-alt mr-2"></i>Refresh
-                </button>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i class="fas fa-calendar-alt mr-2"></i>
+                        <span>{{ now()->format('l, F j, Y') }}</span>
+                    </div>
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i class="fas fa-clock mr-2"></i>
+                        <span>Last updated: <span id="last-updated">{{ now()->format('H:i:s') }}</span></span>
+                    </div>
+                    <button onclick="refreshStats()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <!-- System Alerts -->
     @if(count($alerts) > 0)
@@ -48,111 +57,137 @@
         </div>
     @endif
 
-    <!-- Key Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Total Revenue -->
-        <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
+        <!-- Key Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Revenue -->
+            <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Total Revenue</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">Rs. {{ number_format($stats['total_revenue']) }}</p>
+                            <p class="text-sm text-green-600 mt-1">+Rs. {{ number_format($stats['today_revenue']) }} today</p>
+                        </div>
                         <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
+                            <i class="fas fa-dollar-sign text-green-600 text-lg"></i>
                         </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500">Total Revenue</p>
-                        <p class="text-2xl font-bold text-gray-900">Rs. {{ number_format($stats['total_revenue']) }}</p>
-                        <p class="text-sm text-green-600">+Rs. {{ number_format($stats['today_revenue']) }} today</p>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Total Bookings -->
-        <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
+            <!-- Total Bookings -->
+            <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Total Bookings</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">{{ number_format($stats['total_bookings']) }}</p>
+                            <p class="text-sm text-blue-600 mt-1">{{ $stats['today_bookings'] }} today</p>
+                        </div>
                         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-ticket-alt text-blue-600 text-xl"></i>
+                            <i class="fas fa-ticket-alt text-blue-600 text-lg"></i>
                         </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500">Total Bookings</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ number_format($stats['total_bookings']) }}</p>
-                        <p class="text-sm text-blue-600">{{ $stats['today_bookings'] }} today</p>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Active Users -->
-        <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
+            <!-- Active Users -->
+            <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Active Users</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">{{ number_format($stats['active_users']) }}</p>
+                            <p class="text-sm text-purple-600 mt-1">{{ $stats['new_users_today'] }} new today</p>
+                        </div>
                         <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-users text-purple-600 text-xl"></i>
+                            <i class="fas fa-users text-purple-600 text-lg"></i>
                         </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500">Active Users</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ number_format($stats['active_users']) }}</p>
-                        <p class="text-sm text-purple-600">{{ $stats['new_users_today'] }} new today</p>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Pending Bookings -->
-        <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
+            <!-- Pending Bookings -->
+            <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Pending Bookings</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">{{ number_format($stats['pending_bookings']) }}</p>
+                            <p class="text-sm text-yellow-600 mt-1">Require attention</p>
+                        </div>
                         <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                            <i class="fas fa-clock text-yellow-600 text-lg"></i>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-500">Pending Bookings</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ number_format($stats['pending_bookings']) }}</p>
-                        <p class="text-sm text-yellow-600">Require attention</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Revenue Chart -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900">Revenue Trend</h3>
+                    <div class="flex space-x-1">
+                        <button onclick="updateChart('revenue', '7days')" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors duration-200">7 Days</button>
+                        <button onclick="updateChart('revenue', '30days')" class="px-3 py-1 text-sm bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors duration-200">30 Days</button>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts and Analytics -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Revenue Chart -->
-        <div class="bg-white shadow-lg rounded-xl p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-900">Revenue Trend</h3>
-                <div class="flex space-x-2">
-                    <button onclick="updateChart('revenue', '7days')" class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md">7 Days</button>
-                    <button onclick="updateChart('revenue', '30days')" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md">30 Days</button>
+                <div class="h-64">
+                    <canvas id="revenueChart"></canvas>
                 </div>
             </div>
-            <div class="h-64">
-                <canvas id="revenueChart"></canvas>
+
+            <!-- Bookings Chart -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900">Daily Bookings</h3>
+                    <div class="flex space-x-1">
+                        <button onclick="updateChart('bookings', '7days')" class="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors duration-200">7 Days</button>
+                        <button onclick="updateChart('bookings', '30days')" class="px-3 py-1 text-sm bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors duration-200">30 Days</button>
+                    </div>
+                </div>
+                <div class="h-64">
+                    <canvas id="bookingsChart"></canvas>
+                </div>
             </div>
         </div>
 
-        <!-- Bookings Chart -->
-        <div class="bg-white shadow-lg rounded-xl p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-900">Daily Bookings</h3>
-                <div class="flex space-x-2">
-                    <button onclick="updateChart('bookings', '7days')" class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md">7 Days</button>
-                    <button onclick="updateChart('bookings', '30days')" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md">30 Days</button>
+        <!-- Live Activity Feed -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 mb-8">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Live Activity Feed</h3>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    @if($recentBookings->count() > 0)
+                        @foreach($recentBookings->take(5) as $booking)
+                            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                                <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm text-gray-900">
+                                        <span class="font-medium">{{ $booking->user->name }}</span>
+                                        booked a ticket for
+                                        <span class="font-medium">{{ $booking->schedule->route->full_name }}</span>
+                                    </p>
+                                    <p class="text-xs text-gray-500">{{ $booking->created_at->diffForHumans() }}</p>
+                                </div>
+                                <div class="text-sm font-medium text-gray-900">
+                                    Rs. {{ number_format($booking->total_amount) }}
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="text-center py-8">
+                            <i class="fas fa-chart-line text-4xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">No recent activity to display</p>
+                        </div>
+                    @endif
                 </div>
             </div>
-            <div class="h-64">
-                <canvas id="bookingsChart"></canvas>
-            </div>
         </div>
-    </div>
 
     <!-- Data Tables -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -307,6 +342,7 @@
                 @endforeach
             </div>
         </div>
+    </div>
     </div>
 </div>
 
