@@ -29,8 +29,8 @@ class CounterController extends Controller
         // Get recent counter bookings
         $recentBookings = Auth::user()->operatorBookings()
             ->with(['user', 'schedule.route'])
-            ->where('booking_type', 'counter')
-            ->orderBy('created_at', 'desc')
+            ->where('bookings.booking_type', 'counter')
+            ->orderBy('bookings.created_at', 'desc')
             ->limit(10)
             ->get();
 
@@ -38,17 +38,17 @@ class CounterController extends Controller
         $stats = [
             'today_schedules' => $todaySchedules->count(),
             'today_bookings' => Auth::user()->operatorBookings()
-                ->whereDate('created_at', Carbon::today())
-                ->where('booking_type', 'counter')
+                ->whereDate('bookings.created_at', Carbon::today())
+                ->where('bookings.booking_type', 'counter')
                 ->count(),
             'today_revenue' => Auth::user()->operatorBookings()
-                ->whereDate('created_at', Carbon::today())
-                ->where('booking_type', 'counter')
-                ->where('status', 'confirmed')
-                ->sum('total_amount'),
+                ->whereDate('bookings.created_at', Carbon::today())
+                ->where('bookings.booking_type', 'counter')
+                ->where('bookings.status', 'confirmed')
+                ->sum('bookings.total_amount'),
             'pending_bookings' => Auth::user()->operatorBookings()
-                ->where('status', 'pending')
-                ->where('booking_type', 'counter')
+                ->where('bookings.status', 'pending')
+                ->where('bookings.booking_type', 'counter')
                 ->count(),
         ];
 
@@ -60,7 +60,27 @@ class CounterController extends Controller
      */
     public function search()
     {
-        $cities = City::orderBy('name')->get();
+        // Get unique cities that are used in routes for this operator
+        // Use a direct query to avoid ambiguous column issues
+        $operatorRoutes = Route::whereHas('schedules', function($query) {
+            $query->where('operator_id', Auth::id());
+        })->pluck('routes.id');
+
+        $cityIds = Route::whereIn('id', $operatorRoutes)
+            ->select('source_city_id', 'destination_city_id')
+            ->get()
+            ->flatMap(function ($route) {
+                return [$route->source_city_id, $route->destination_city_id];
+            })
+            ->unique();
+
+        $cities = City::whereIn('id', $cityIds)->orderBy('name')->get();
+
+        // Fallback to all cities if operator has no routes
+        if ($cities->isEmpty()) {
+            $cities = City::orderBy('name')->get();
+        }
+
         return view('operator.counter.search', compact('cities'));
     }
 
@@ -120,6 +140,15 @@ class CounterController extends Controller
         // Get seat map
         $seatMap = $this->generateSeatMapWithBookings($schedule);
 
+        // Debug: Log the seat map structure for troubleshooting
+        \Log::info('Seat map structure for schedule ' . $schedule->id, [
+            'has_layout' => isset($seatMap['layout']),
+            'has_seats' => isset($seatMap['seats']),
+            'layout_keys' => isset($seatMap['layout']) ? array_keys($seatMap['layout']) : [],
+            'seat_count' => isset($seatMap['seats']) ? count($seatMap['seats']) : 0,
+            'first_seat' => isset($seatMap['seats'][0]) ? $seatMap['seats'][0] : null,
+        ]);
+
         return view('operator.counter.book', compact('schedule', 'seatMap'));
     }
 
@@ -132,6 +161,13 @@ class CounterController extends Controller
         if ($schedule->operator_id !== Auth::id()) {
             abort(403, 'Unauthorized access to schedule.');
         }
+
+        // Log request data for debugging
+        \Log::info('Counter booking request received', [
+            'request_data' => $request->all(),
+            'schedule_id' => $schedule->id,
+            'operator_id' => Auth::id(),
+        ]);
 
         $request->validate([
             'passenger_name' => 'required|string|max:255',
@@ -210,6 +246,16 @@ class CounterController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
+
+            // Log the error for debugging
+            \Log::error('Counter booking failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+                'schedule_id' => $schedule->id,
+                'operator_id' => Auth::id(),
+            ]);
+
             return back()->withInput()
                 ->with('error', 'Failed to create booking: ' . $e->getMessage());
         }
@@ -288,11 +334,57 @@ class CounterController extends Controller
             ->flatten()
             ->toArray();
 
-        foreach ($seatLayout['seats'] as &$seat) {
-            $seat['is_booked'] = in_array($seat['number'], $bookedSeats);
-            $seat['is_available'] = !$seat['is_booked'];
+        // If the seat layout doesn't have the expected structure, create a default one
+        if (!isset($seatLayout['seats']) || !isset($seatLayout['rows']) || !isset($seatLayout['columns'])) {
+            // Generate a default layout based on total seats
+            $totalSeats = $schedule->bus->total_seats;
+            $columns = 4; // Default 4 columns
+            $rows = ceil($totalSeats / $columns);
+
+            $seats = [];
+            for ($i = 1; $i <= $totalSeats; $i++) {
+                $seats[] = [
+                    'number' => $i,
+                    'type' => 'seat',
+                    'is_booked' => in_array($i, $bookedSeats),
+                    'is_available' => !in_array($i, $bookedSeats),
+                ];
+            }
+
+            return [
+                'layout' => [
+                    'rows' => $rows,
+                    'columns' => $columns,
+                    'aisle_position' => 2,
+                ],
+                'seats' => $seats,
+            ];
         }
 
-        return $seatLayout;
+        // Update booking status for each seat
+        foreach ($seatLayout['seats'] as &$seat) {
+            $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
+            if ($seatNumber) {
+                $seat['is_booked'] = in_array($seatNumber, $bookedSeats);
+                $seat['is_available'] = !$seat['is_booked'];
+                $seat['type'] = 'seat'; // Ensure type is set
+                $seat['number'] = $seatNumber; // Normalize the key
+
+                // Remove the old key if it exists
+                if (isset($seat['seat_number']) && $seat['seat_number'] !== $seat['number']) {
+                    unset($seat['seat_number']);
+                }
+            }
+        }
+
+        // Return the structure expected by the view
+        return [
+            'layout' => [
+                'rows' => $seatLayout['rows'] ?? ceil($schedule->bus->total_seats / 4),
+                'columns' => $seatLayout['columns'] ?? 4,
+                'aisle_position' => $seatLayout['aisle_position'] ?? 2,
+            ],
+            'seats' => $seatLayout['seats'],
+        ];
     }
 }

@@ -22,7 +22,11 @@ class Booking extends Model
         'contact_phone',
         'contact_email',
         'booking_expires_at',
-        'special_requests'
+        'special_requests',
+        'booking_type',
+        'payment_method',
+        'payment_status',
+        'booked_by'
     ];
 
     protected $casts = [
@@ -76,6 +80,14 @@ class Booking extends Model
     }
 
     /**
+     * Get the user who created this booking (for counter bookings).
+     */
+    public function bookedBy()
+    {
+        return $this->belongsTo(User::class, 'booked_by');
+    }
+
+    /**
      * Check if booking is expired.
      */
     public function isExpired()
@@ -89,5 +101,34 @@ class Booking extends Model
     public function getSeatNumbersStringAttribute()
     {
         return implode(', ', $this->seat_numbers);
+    }
+
+    /**
+     * Get passenger names as comma-separated string.
+     */
+    public function getPassengerNamesStringAttribute()
+    {
+        if (!$this->passenger_details) {
+            return 'N/A';
+        }
+
+        $names = collect($this->passenger_details)->pluck('name')->filter();
+        return $names->isEmpty() ? 'N/A' : $names->implode(', ');
+    }
+
+    /**
+     * Get the primary passenger (first passenger).
+     */
+    public function getPrimaryPassengerAttribute()
+    {
+        return $this->passenger_details[0] ?? null;
+    }
+
+    /**
+     * Get passenger count from passenger details.
+     */
+    public function getPassengerCountFromDetailsAttribute()
+    {
+        return $this->passenger_details ? count($this->passenger_details) : 0;
     }
 }

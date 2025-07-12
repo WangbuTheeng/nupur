@@ -8,6 +8,7 @@ use App\Models\Schedule;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class BookingController extends Controller
@@ -70,7 +71,28 @@ class BookingController extends Controller
         $routes = $operator->routes()->where('is_active', true)->get();
         $statuses = ['pending', 'confirmed', 'cancelled', 'completed'];
 
-        return view('operator.bookings.index', compact('bookings', 'routes', 'statuses'));
+        // Calculate statistics
+        $stats = [
+            'total' => Booking::whereHas('schedule', function($q) use ($operator) {
+                $q->where('operator_id', $operator->id);
+            })->count(),
+
+            'confirmed' => Booking::whereHas('schedule', function($q) use ($operator) {
+                $q->where('operator_id', $operator->id);
+            })->where('status', 'confirmed')->count(),
+
+            'pending' => Booking::whereHas('schedule', function($q) use ($operator) {
+                $q->where('operator_id', $operator->id);
+            })->where('status', 'pending')->count(),
+
+            'today_revenue' => Booking::whereHas('schedule', function($q) use ($operator) {
+                $q->where('operator_id', $operator->id);
+            })->where('status', 'confirmed')
+              ->whereDate('created_at', Carbon::today())
+              ->sum('total_amount'),
+        ];
+
+        return view('operator.bookings.index', compact('bookings', 'routes', 'statuses', 'stats'));
     }
 
     /**
@@ -83,7 +105,7 @@ class BookingController extends Controller
             abort(403, 'Unauthorized access to booking');
         }
 
-        $booking->load(['user', 'schedule.route', 'schedule.bus', 'payments', 'passengers']);
+        $booking->load(['user', 'schedule.route', 'schedule.bus', 'payments']);
 
         return view('operator.bookings.show', compact('booking'));
     }
@@ -326,6 +348,169 @@ class BookingController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Show today's bookings.
+     */
+    public function today()
+    {
+        $operator = Auth::user();
+        $today = Carbon::today();
+
+        // Get today's schedules with bookings
+        $schedules = $operator->schedules()
+            ->with(['route.sourceCity', 'route.destinationCity', 'bus', 'bookings.user'])
+            ->whereDate('travel_date', $today)
+            ->orderBy('departure_time')
+            ->get();
+
+        // Calculate statistics
+        $stats = [
+            'total_bookings' => $schedules->sum(function($schedule) {
+                return $schedule->bookings->count();
+            }),
+            'confirmed_bookings' => $schedules->sum(function($schedule) {
+                return $schedule->bookings->where('status', 'confirmed')->count();
+            }),
+            'pending_bookings' => $schedules->sum(function($schedule) {
+                return $schedule->bookings->where('status', 'pending')->count();
+            }),
+            'total_revenue' => $schedules->sum(function($schedule) {
+                return $schedule->bookings->where('status', 'confirmed')->sum('total_amount');
+            }),
+        ];
+
+        return view('operator.bookings.today', compact('schedules', 'stats'));
+    }
+
+    /**
+     * Show upcoming bookings.
+     */
+    public function upcoming(Request $request)
+    {
+        $operator = Auth::user();
+
+        $query = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id)
+              ->where('travel_date', '>', Carbon::today());
+        })->with(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus']);
+
+        // Apply filters
+        if ($request->filled('route')) {
+            $query->whereHas('schedule.route', function($q) use ($request) {
+                $q->where('id', $request->route);
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereHas('schedule', function($q) use ($request) {
+                $q->whereDate('travel_date', '>=', $request->date_from);
+            });
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereHas('schedule', function($q) use ($request) {
+                $q->whereDate('travel_date', '<=', $request->date_to);
+            });
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('booking_reference', 'like', "%{$search}%")
+                  ->orWhereHas('user', function($userQuery) use ($search) {
+                      $userQuery->where('name', 'like', "%{$search}%")
+                               ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $bookings = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        // Get filter options
+        $routes = $operator->routes()->where('is_active', true)->get();
+
+        return view('operator.bookings.upcoming', compact('bookings', 'routes'));
+    }
+
+    /**
+     * Confirm a booking.
+     */
+    public function confirm(Booking $booking)
+    {
+        // Ensure operator owns this booking
+        if ($booking->schedule->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to booking');
+        }
+
+        if ($booking->status === 'confirmed') {
+            return back()->with('error', 'Booking is already confirmed.');
+        }
+
+        $booking->update([
+            'status' => 'confirmed',
+            'payment_status' => 'paid'
+        ]);
+
+        return back()->with('success', 'Booking confirmed successfully.');
+    }
+
+    /**
+     * Cancel a booking.
+     */
+    public function cancel(Request $request, Booking $booking)
+    {
+        // Ensure operator owns this booking
+        if ($booking->schedule->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to booking');
+        }
+
+        if ($booking->status === 'cancelled') {
+            return back()->with('error', 'Booking is already cancelled.');
+        }
+
+        $request->validate([
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $booking->update([
+                'status' => 'cancelled',
+                'cancellation_reason' => $request->reason
+            ]);
+
+            // Restore available seats
+            $booking->schedule->increment('available_seats', $booking->passenger_count);
+
+            DB::commit();
+
+            return back()->with('success', 'Booking cancelled successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return back()->with('error', 'Failed to cancel booking. Please try again.');
+        }
+    }
+
+    /**
+     * Generate and display ticket.
+     */
+    public function ticket(Booking $booking)
+    {
+        // Ensure operator owns this booking
+        if ($booking->schedule->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to booking');
+        }
+
+        if ($booking->status !== 'confirmed') {
+            return back()->with('error', 'Ticket can only be generated for confirmed bookings.');
+        }
+
+        $booking->load(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus.busType']);
+
+        return view('operator.bookings.ticket', compact('booking'));
     }
 
     /**

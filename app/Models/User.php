@@ -93,7 +93,29 @@ class User extends Authenticatable
      */
     public function operatorBookings()
     {
-        return $this->hasManyThrough(Booking::class, Schedule::class, 'operator_id', 'schedule_id');
+        return $this->hasManyThrough(
+            Booking::class,
+            Schedule::class,
+            'operator_id', // Foreign key on schedules table
+            'schedule_id', // Foreign key on bookings table
+            'id', // Local key on users table
+            'id' // Local key on schedules table
+        )->select('bookings.*'); // Explicitly select from bookings table to avoid ambiguity
+    }
+
+    /**
+     * Get routes that this operator has schedules for.
+     */
+    public function routes()
+    {
+        return $this->hasManyThrough(
+            Route::class,
+            Schedule::class,
+            'operator_id', // Foreign key on schedules table
+            'id', // Foreign key on routes table
+            'id', // Local key on users table
+            'route_id' // Local key on schedules table
+        )->select('routes.*')->distinct(); // Explicitly select from routes table to avoid ambiguity
     }
 
     /**

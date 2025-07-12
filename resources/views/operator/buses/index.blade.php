@@ -25,78 +25,78 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Total Buses -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Total Buses
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $stats['total'] }}</div>
+        <div class="bg-white overflow-hidden shadow-lg rounded-xl border-l-4 border-blue-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-bus text-blue-600 text-xl"></i>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-bus fa-2x text-gray-300"></i>
-                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Buses</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ $stats['total'] }}</dd>
+                        </dl>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Active Buses -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Active Buses
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $stats['active'] }}</div>
+        <div class="bg-white overflow-hidden shadow-lg rounded-xl border-l-4 border-green-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-600 text-xl"></i>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Buses</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ $stats['active'] }}</dd>
+                        </dl>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Inactive Buses -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Inactive Buses
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $stats['inactive'] }}</div>
+        <div class="bg-white overflow-hidden shadow-lg rounded-xl border-l-4 border-red-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-times-circle text-red-600 text-xl"></i>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-times-circle fa-2x text-gray-300"></i>
-                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Inactive Buses</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ $stats['inactive'] }}</dd>
+                        </dl>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Today's Schedules -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Today's Schedules
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $stats['scheduled_today'] }}</div>
+        <div class="bg-white overflow-hidden shadow-lg rounded-xl border-l-4 border-yellow-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-calendar-check text-yellow-600 text-xl"></i>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-calendar-check fa-2x text-gray-300"></i>
-                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Today's Schedules</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ $stats['scheduled_today'] }}</dd>
+                        </dl>
                     </div>
                 </div>
             </div>
@@ -104,61 +104,54 @@
     </div>
 
     <!-- Filters -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" action="{{ route('operator.buses.index') }}">
-                <div class="row">
-                    <!-- Search -->
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="search">Search</label>
-                            <input type="text" name="search" id="search" value="{{ request('search') }}"
-                                   placeholder="Bus number, license plate..."
-                                   class="form-control">
-                        </div>
-                    </div>
+    <div class="bg-white overflow-hidden shadow-lg rounded-xl mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Filter Buses</h3>
+        </div>
+        <div class="p-6">
+            <form method="GET" action="{{ route('operator.buses.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Search -->
+                <div>
+                    <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search Buses</label>
+                    <input type="text" name="search" id="search" value="{{ request('search') }}"
+                           placeholder="Bus number, license plate..."
+                           class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                </div>
 
-                    <!-- Status Filter -->
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label for="status">Status</label>
-                            <select name="status" id="status" class="form-control">
-                                <option value="">All Statuses</option>
-                                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
-                            </select>
-                        </div>
-                    </div>
+                <!-- Status Filter -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select name="status" id="status" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                        <option value="">All Status</option>
+                        <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    </select>
+                </div>
 
-                    <!-- Bus Type Filter -->
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label for="bus_type">Bus Type</label>
-                            <select name="bus_type" id="bus_type" class="form-control">
-                                <option value="">All Types</option>
-                                @foreach($busTypes as $type)
-                                    <option value="{{ $type->id }}" {{ request('bus_type') == $type->id ? 'selected' : '' }}>
-                                        {{ $type->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
+                <!-- Bus Type Filter -->
+                <div>
+                    <label for="bus_type" class="block text-sm font-medium text-gray-700 mb-2">Bus Type</label>
+                    <select name="bus_type" id="bus_type" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                        <option value="">All Types</option>
+                        @foreach($busTypes as $type)
+                            <option value="{{ $type->id }}" {{ request('bus_type') == $type->id ? 'selected' : '' }}>
+                                {{ $type->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-                    <!-- Filter Buttons -->
-                    <div class="col-md-2">
-                        <div class="form-group">
-                            <label>&nbsp;</label>
-                            <div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search"></i> Filter
-                                </button>
-                                <a href="{{ route('operator.buses.index') }}" class="btn btn-secondary">
-                                    Clear
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Filter Buttons -->
+                <div class="flex items-end space-x-3">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Search
+                    </button>
+                    <a href="{{ route('operator.buses.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                        Clear
+                    </a>
                 </div>
             </form>
         </div>

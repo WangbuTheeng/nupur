@@ -112,6 +112,7 @@ class ScheduleSeeder extends Seeder
                         $schedules[] = [
                             'bus_id' => $bus->id,
                             'route_id' => $route->id,
+                            'operator_id' => $bus->operator_id,
                             'travel_date' => $currentDate->format('Y-m-d'),
                             'departure_time' => $timeSlot['departure'],
                             'arrival_time' => $timeSlot['arrival'],

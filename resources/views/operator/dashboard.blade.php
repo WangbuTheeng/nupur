@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.operator')
 
 @section('title', 'Operator Dashboard')
 
