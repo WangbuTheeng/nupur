@@ -114,7 +114,7 @@
                                                 <div class="text-sm text-gray-500">{{ $booking->user->email ?? 'N/A' }}</div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $booking->user->phone ?? 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $booking->seats_count ?? 0 }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $booking->passenger_count ?? 0 }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Rs. {{ number_format($booking->total_amount ?? 0, 2) }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 

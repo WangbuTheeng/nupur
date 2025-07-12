@@ -110,7 +110,7 @@ class Schedule extends Model
     {
         return $this->bookings()
                    ->where('status', '!=', 'cancelled')
-                   ->sum('seats_count');
+                   ->sum('passenger_count');
     }
 
     /**

@@ -80,6 +80,14 @@ class Bus extends Model
     }
 
     /**
+     * Get the bookings for this bus through schedules.
+     */
+    public function bookings()
+    {
+        return $this->hasManyThrough(Booking::class, Schedule::class);
+    }
+
+    /**
      * Get the bus display name.
      */
     public function getDisplayNameAttribute()
@@ -124,14 +132,11 @@ class Bus extends Model
      */
     public function getAvailableSeatsForSchedule($scheduleId)
     {
-        $bookedSeats = $this->seats()
-            ->whereHas('bookings', function($query) use ($scheduleId) {
-                $query->where('schedule_id', $scheduleId)
-                      ->where('status', '!=', 'cancelled');
-            })
-            ->count();
+        $bookedSeatsCount = Booking::where('schedule_id', $scheduleId)
+            ->where('status', '!=', 'cancelled')
+            ->sum('passenger_count');
 
-        return $this->total_seats - $bookedSeats;
+        return $this->total_seats - $bookedSeatsCount;
     }
 
     /**

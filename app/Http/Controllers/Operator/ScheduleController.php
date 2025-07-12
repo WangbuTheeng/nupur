@@ -155,6 +155,9 @@ class ScheduleController extends Controller
 
         $schedule->load(['route', 'bus', 'bookings.user']);
 
+        // Get bookings for this schedule
+        $bookings = $schedule->bookings()->with('user')->orderBy('created_at', 'desc')->get();
+
         // Get seat map with booking status
         $seatMap = $this->generateSeatMapWithBookings($schedule);
 
@@ -167,7 +170,7 @@ class ScheduleController extends Controller
             'pending_bookings' => $schedule->bookings()->where('status', 'pending')->count(),
         ];
 
-        return view('operator.schedules.show', compact('schedule', 'seatMap', 'stats'));
+        return view('operator.schedules.show', compact('schedule', 'seatMap', 'stats', 'bookings'));
     }
 
     /**
@@ -306,6 +309,42 @@ class ScheduleController extends Controller
     }
 
     /**
+     * Update schedule status.
+     */
+    public function updateStatus(Request $request, Schedule $schedule)
+    {
+        // Ensure operator can only update their own schedules
+        if ($schedule->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to schedule.');
+        }
+
+        $request->validate([
+            'status' => 'required|in:scheduled,boarding,departed,arrived,completed,cancelled',
+        ]);
+
+        $oldStatus = $schedule->status;
+        $newStatus = $request->status;
+
+        // Validate status transitions
+        $validTransitions = [
+            'scheduled' => ['boarding', 'cancelled', 'completed'],
+            'boarding' => ['departed', 'cancelled'],
+            'departed' => ['arrived', 'completed'],
+            'arrived' => ['completed'],
+            'completed' => [], // No transitions from completed
+            'cancelled' => [], // No transitions from cancelled
+        ];
+
+        if (!in_array($newStatus, $validTransitions[$oldStatus] ?? [])) {
+            return back()->with('error', "Cannot change status from {$oldStatus} to {$newStatus}.");
+        }
+
+        $schedule->update(['status' => $newStatus]);
+
+        return back()->with('success', "Schedule status updated to {$newStatus} successfully!");
+    }
+
+    /**
      * Generate seat map with booking information.
      */
     private function generateSeatMapWithBookings(Schedule $schedule)
@@ -317,8 +356,12 @@ class ScheduleController extends Controller
             ->flatten()
             ->toArray();
 
-        foreach ($seatLayout['seats'] as &$seat) {
-            $seat['is_booked'] = in_array($seat['number'], $bookedSeats);
+        if (isset($seatLayout['seats']) && is_array($seatLayout['seats'])) {
+            foreach ($seatLayout['seats'] as &$seat) {
+                // Handle both 'number' and 'seat_number' keys for backward compatibility
+                $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
+                $seat['is_booked'] = $seatNumber ? in_array($seatNumber, $bookedSeats) : false;
+            }
         }
 
         return $seatLayout;

@@ -31,143 +31,191 @@
                     <h3 class="text-lg font-medium text-gray-900">Bus Information</h3>
                 </div>
                 <div class="p-6">
-                    <form method="POST" action="{{ route('operator.buses.store') }}">
+                    <form method="POST" action="{{ route('operator.buses.store') }}" class="space-y-6">
                         @csrf
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="bus_number">Bus Number <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('bus_number') is-invalid @enderror" 
-                                           id="bus_number" name="bus_number" value="{{ old('bus_number') }}" required>
-                                    @error('bus_number')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="bus_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Bus Number <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text"
+                                       class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('bus_number') border-red-300 @enderror"
+                                       id="bus_number" name="bus_number" value="{{ old('bus_number') }}"
+                                       placeholder="e.g., KTM-001" required>
+                                @error('bus_number')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="license_plate">License Plate <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('license_plate') is-invalid @enderror" 
-                                           id="license_plate" name="license_plate" value="{{ old('license_plate') }}" required>
-                                    @error('license_plate')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="bus_type_id">Bus Type <span class="text-danger">*</span></label>
-                                    <select class="form-control @error('bus_type_id') is-invalid @enderror" 
-                                            id="bus_type_id" name="bus_type_id" required>
-                                        <option value="">Select Bus Type</option>
-                                        @foreach($busTypes as $type)
-                                            <option value="{{ $type->id }}" {{ old('bus_type_id') == $type->id ? 'selected' : '' }}>
-                                                {{ $type->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    @error('bus_type_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="total_seats">Total Seats <span class="text-danger">*</span></label>
-                                    <input type="number" min="10" max="100" 
-                                           class="form-control @error('total_seats') is-invalid @enderror" 
-                                           id="total_seats" name="total_seats" value="{{ old('total_seats') }}" required>
-                                    @error('total_seats')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="license_plate" class="block text-sm font-medium text-gray-700 mb-2">
+                                    License Plate <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text"
+                                       class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('license_plate') border-red-300 @enderror"
+                                       id="license_plate" name="license_plate" value="{{ old('license_plate') }}"
+                                       placeholder="e.g., BA 1 KHA 1234" required>
+                                @error('license_plate')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="model">Model <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('model') is-invalid @enderror" 
-                                           id="model" name="model" value="{{ old('model') }}" required>
-                                    @error('model')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="bus_type_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Bus Type <span class="text-red-500">*</span>
+                                </label>
+                                <select class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('bus_type_id') border-red-300 @enderror"
+                                        id="bus_type_id" name="bus_type_id" required>
+                                    <option value="">Select Bus Type</option>
+                                    @foreach($busTypes as $type)
+                                        <option value="{{ $type->id }}" {{ old('bus_type_id') == $type->id ? 'selected' : '' }}>
+                                            {{ $type->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('bus_type_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="color">Color <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('color') is-invalid @enderror" 
-                                           id="color" name="color" value="{{ old('color') }}" required>
-                                    @error('color')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="total_seats" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Total Seats <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" min="10" max="100"
+                                       class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('total_seats') border-red-300 @enderror"
+                                       id="total_seats" name="total_seats" value="{{ old('total_seats') }}"
+                                       placeholder="e.g., 32" required>
+                                @error('total_seats')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="manufacture_year">Manufacture Year <span class="text-danger">*</span></label>
-                            <input type="number" min="1990" max="{{ date('Y') + 1 }}" 
-                                   class="form-control @error('manufacture_year') is-invalid @enderror" 
-                                   id="manufacture_year" name="manufacture_year" value="{{ old('manufacture_year') }}" required>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="model" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Model <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text"
+                                       class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('model') border-red-300 @enderror"
+                                       id="model" name="model" value="{{ old('model') }}"
+                                       placeholder="e.g., Tata Ultra" required>
+                                @error('model')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label for="color" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Color <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text"
+                                       class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('color') border-red-300 @enderror"
+                                       id="color" name="color" value="{{ old('color') }}"
+                                       placeholder="e.g., Blue" required>
+                                @error('color')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="manufacture_year" class="block text-sm font-medium text-gray-700 mb-2">
+                                Manufacture Year <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" min="1990" max="{{ date('Y') + 1 }}"
+                                   class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('manufacture_year') border-red-300 @enderror"
+                                   id="manufacture_year" name="manufacture_year" value="{{ old('manufacture_year') }}"
+                                   placeholder="e.g., {{ date('Y') }}" required>
                             @error('manufacture_year')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        <div class="form-group">
-                            <label for="amenities">Amenities</label>
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="amenities[]" value="WiFi" id="wifi">
-                                        <label class="form-check-label" for="wifi">WiFi</label>
-                                    </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-3">Amenities</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="WiFi" id="wifi"
+                                           {{ in_array('WiFi', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="wifi" class="ml-2 text-sm text-gray-700">WiFi</label>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="amenities[]" value="AC" id="ac">
-                                        <label class="form-check-label" for="ac">Air Conditioning</label>
-                                    </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="AC" id="ac"
+                                           {{ in_array('AC', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="ac" class="ml-2 text-sm text-gray-700">Air Conditioning</label>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="amenities[]" value="TV" id="tv">
-                                        <label class="form-check-label" for="tv">TV/Entertainment</label>
-                                    </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Charging Port" id="charging"
+                                           {{ in_array('Charging Port', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="charging" class="ml-2 text-sm text-gray-700">Charging Port</label>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="amenities[]" value="USB" id="usb">
-                                        <label class="form-check-label" for="usb">USB Charging</label>
-                                    </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Reading Light" id="reading_light"
+                                           {{ in_array('Reading Light', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="reading_light" class="ml-2 text-sm text-gray-700">Reading Light</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Entertainment System" id="entertainment"
+                                           {{ in_array('Entertainment System', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="entertainment" class="ml-2 text-sm text-gray-700">Entertainment System</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Large Windows" id="windows"
+                                           {{ in_array('Large Windows', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="windows" class="ml-2 text-sm text-gray-700">Large Windows</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Panoramic View" id="panoramic"
+                                           {{ in_array('Panoramic View', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="panoramic" class="ml-2 text-sm text-gray-700">Panoramic View</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                           name="amenities[]" value="Blanket" id="blanket"
+                                           {{ in_array('Blanket', old('amenities', [])) ? 'checked' : '' }}>
+                                    <label for="blanket" class="ml-2 text-sm text-gray-700">Blanket</label>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="description">Description</label>
-                            <textarea class="form-control @error('description') is-invalid @enderror" 
-                                      id="description" name="description" rows="3" 
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                                Description
+                            </label>
+                            <textarea class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('description') border-red-300 @enderror"
+                                      id="description" name="description" rows="4"
                                       placeholder="Additional information about the bus...">{{ old('description') }}</textarea>
                             @error('description')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Add Bus
-                            </button>
-                            <a href="{{ route('operator.buses.index') }}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancel
+                        <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+                            <a href="{{ route('operator.buses.index') }}"
+                               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <i class="fas fa-times mr-2"></i> Cancel
                             </a>
+                            <button type="submit"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <i class="fas fa-save mr-2"></i> Add Bus
+                            </button>
                         </div>
                     </form>
                 </div>

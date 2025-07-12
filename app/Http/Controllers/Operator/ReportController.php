@@ -240,6 +240,58 @@ class ReportController extends Controller
     }
 
     /**
+     * Generate bookings report.
+     */
+    public function bookings(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'status' => 'nullable|in:pending,confirmed,cancelled,completed',
+            'route_id' => 'nullable|exists:routes,id',
+        ]);
+
+        $dateFrom = $request->date_from ? Carbon::parse($request->date_from) : Carbon::now()->subMonth();
+        $dateTo = $request->date_to ? Carbon::parse($request->date_to) : Carbon::now();
+
+        $query = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->with(['user', 'schedule.route', 'schedule.bus'])
+          ->whereBetween('created_at', [$dateFrom, $dateTo]);
+
+        // Apply filters
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('route_id')) {
+            $query->whereHas('schedule.route', function($q) use ($request) {
+                $q->where('id', $request->route_id);
+            });
+        }
+
+        $bookings = $query->orderBy('created_at', 'desc')->paginate(50);
+
+        // Get filter options
+        $routes = $operator->routes()->where('is_active', true)->get();
+        $statuses = ['pending', 'confirmed', 'cancelled', 'completed'];
+
+        // Calculate statistics
+        $stats = [
+            'total_bookings' => $query->count(),
+            'total_revenue' => $query->where('status', 'confirmed')->sum('total_amount'),
+            'average_booking_value' => $query->where('status', 'confirmed')->avg('total_amount') ?? 0,
+            'confirmed_bookings' => $query->where('status', 'confirmed')->count(),
+            'pending_bookings' => $query->where('status', 'pending')->count(),
+            'cancelled_bookings' => $query->where('status', 'cancelled')->count(),
+        ];
+
+        return view('operator.reports.bookings', compact('bookings', 'routes', 'statuses', 'stats', 'dateFrom', 'dateTo'));
+    }
+
+    /**
      * Generate customer analytics report.
      */
     public function customerAnalytics(Request $request)

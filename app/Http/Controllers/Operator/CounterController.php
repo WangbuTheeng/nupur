@@ -209,6 +209,9 @@ class CounterController extends Controller
             $farePerSeat = $schedule->fare;
             $totalAmount = $farePerSeat * $passengerCount;
 
+            // Determine the best email to use for contact
+            $contactEmail = $request->contact_email ?: $request->passenger_email;
+
             // Create booking
             $booking = Booking::create([
                 'booking_reference' => 'CTR-' . strtoupper(uniqid()),
@@ -226,7 +229,7 @@ class CounterController extends Controller
                     ]
                 ],
                 'contact_phone' => $request->contact_phone,
-                'contact_email' => $request->contact_email,
+                'contact_email' => $contactEmail,
                 'total_amount' => $totalAmount,
                 'booking_type' => 'counter',
                 'payment_method' => $request->payment_method,

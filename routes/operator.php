@@ -35,6 +35,7 @@ Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->
     // Schedule Management
     Route::resource('schedules', ScheduleController::class);
     Route::post('schedules/{schedule}/toggle-status', [ScheduleController::class, 'toggleStatus'])->name('schedules.toggle-status');
+    Route::patch('schedules/{schedule}/update-status', [ScheduleController::class, 'updateStatus'])->name('schedules.update-status');
     Route::get('schedules/calendar', [ScheduleController::class, 'calendar'])->name('schedules.calendar');
     Route::post('schedules/bulk-create', [ScheduleController::class, 'bulkCreate'])->name('schedules.bulk-create');
     Route::get('schedules/{schedule}/passengers', [ScheduleController::class, 'passengers'])->name('schedules.passengers');

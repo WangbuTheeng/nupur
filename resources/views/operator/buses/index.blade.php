@@ -159,78 +159,121 @@
 
     <!-- Buses Grid -->
     @if($buses->count() > 0)
-        <div class="row">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             @foreach($buses as $bus)
-                <div class="col-lg-4 col-md-6 mb-4">
-                    <div class="card shadow h-100">
-                        <!-- Bus Header -->
-                        <div class="card-header bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="card-title mb-1">{{ $bus->bus_number }}</h5>
-                                    <small class="text-muted">{{ $bus->license_plate }}</small>
+                <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <!-- Bus Header -->
+                    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">{{ $bus->bus_number }}</h3>
+                                <p class="text-sm text-gray-600">{{ $bus->license_plate }}</p>
+                            </div>
+                            <div>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $bus->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    <span class="w-1.5 h-1.5 mr-1.5 rounded-full {{ $bus->is_active ? 'bg-green-400' : 'bg-red-400' }}"></span>
+                                    {{ $bus->is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bus Details -->
+                    <div class="p-6">
+                        <div class="space-y-3 mb-4">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-tag text-blue-600 text-sm"></i>
                                 </div>
                                 <div>
-                                    <span class="badge badge-{{ $bus->is_active ? 'success' : 'danger' }}">
-                                        {{ $bus->is_active ? 'Active' : 'Inactive' }}
-                                    </span>
+                                    <p class="text-xs text-gray-500">Bus Type</p>
+                                    <p class="text-sm font-semibold text-gray-900">{{ $bus->busType->name ?? 'N/A' }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-car text-purple-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Model & Year</p>
+                                    <p class="text-sm font-semibold text-gray-900">{{ $bus->model }} ({{ $bus->manufacture_year }})</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-users text-green-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Capacity</p>
+                                    <p class="text-sm font-semibold text-gray-900">{{ $bus->total_seats }} seats</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Bus Details -->
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="fas fa-tag text-muted me-2"></i>
-                                    <span class="text-sm">{{ $bus->busType->name ?? 'N/A' }}</span>
-                                </div>
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="fas fa-car text-muted me-2"></i>
-                                    <span class="text-sm">{{ $bus->model }} ({{ $bus->manufacture_year }})</span>
-                                </div>
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="fas fa-users text-muted me-2"></i>
-                                    <span class="text-sm">{{ $bus->total_seats }} seats</span>
-                                </div>
-                            </div>
-
-                            <!-- Upcoming Schedules -->
-                            @if($bus->schedules->count() > 0)
-                                <div class="border-top pt-3">
-                                    <h6 class="text-sm font-weight-bold mb-2">Upcoming Schedules</h6>
+                        <!-- Upcoming Schedules -->
+                        @if($bus->schedules->count() > 0)
+                            <div class="border-t border-gray-200 pt-4">
+                                <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                                    <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>
+                                    Upcoming Schedules
+                                </h4>
+                                <div class="space-y-2">
                                     @foreach($bus->schedules->take(2) as $schedule)
-                                        <div class="text-xs text-muted mb-1">
-                                            {{ $schedule->route->name ?? 'N/A' }} - {{ $schedule->travel_date }} {{ $schedule->departure_time }}
+                                        <div class="flex items-center justify-between text-xs bg-blue-50 rounded-lg p-3">
+                                            <div class="flex-1">
+                                                <div class="font-medium text-blue-900">{{ $schedule->route->name ?? 'N/A' }}</div>
+                                                <div class="text-blue-600 mt-1">{{ $schedule->travel_date }} • {{ $schedule->departure_time }}</div>
+                                            </div>
+                                            <div class="ml-2">
+                                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <i class="fas fa-clock mr-1"></i>
+                                                    {{ \Carbon\Carbon::parse($schedule->departure_time)->format('H:i') }}
+                                                </span>
+                                            </div>
                                         </div>
                                     @endforeach
                                     @if($bus->schedules->count() > 2)
-                                        <div class="text-xs text-muted">+{{ $bus->schedules->count() - 2 }} more</div>
+                                        <div class="text-xs text-gray-500 text-center py-2">
+                                            <i class="fas fa-plus-circle mr-1"></i>
+                                            {{ $bus->schedules->count() - 2 }} more schedules
+                                        </div>
                                     @endif
                                 </div>
-                            @endif
-                        </div>
+                            </div>
+                        @else
+                            <div class="border-t border-gray-200 pt-4">
+                                <div class="text-center py-4">
+                                    <i class="fas fa-calendar-times text-gray-300 text-2xl mb-2"></i>
+                                    <p class="text-sm text-gray-500">No upcoming schedules</p>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
 
-                        <!-- Bus Actions -->
-                        <div class="card-footer bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="btn-group" role="group">
-                                    <a href="{{ route('operator.buses.show', $bus) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> View
-                                    </a>
-                                    <a href="{{ route('operator.buses.edit', $bus) }}" class="btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                </div>
-                                <div>
-                                    <form method="POST" action="{{ route('operator.buses.toggle-status', $bus) }}" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-{{ $bus->is_active ? 'danger' : 'success' }}">
-                                            <i class="fas fa-{{ $bus->is_active ? 'times' : 'check' }}"></i>
-                                            {{ $bus->is_active ? 'Deactivate' : 'Activate' }}
-                                        </button>
-                                    </form>
-                                </div>
+                    <!-- Bus Actions -->
+                    <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex space-x-2">
+                                <a href="{{ route('operator.buses.show', $bus) }}"
+                                   class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                                    <i class="fas fa-eye mr-1.5"></i>
+                                    View
+                                </a>
+                                <a href="{{ route('operator.buses.edit', $bus) }}"
+                                   class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                                    <i class="fas fa-edit mr-1.5"></i>
+                                    Edit
+                                </a>
+                            </div>
+                            <div>
+                                <form method="POST" action="{{ route('operator.buses.toggle-status', $bus) }}" class="inline">
+                                    @csrf
+                                    <button type="submit"
+                                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white {{ $bus->is_active ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500' }} focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200">
+                                        <i class="fas fa-{{ $bus->is_active ? 'times' : 'check' }} mr-1.5"></i>
+                                        {{ $bus->is_active ? 'Deactivate' : 'Activate' }}
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -239,18 +282,22 @@
         </div>
 
         <!-- Pagination -->
-        <div class="d-flex justify-content-center">
+        <div class="flex justify-center">
             {{ $buses->appends(request()->query())->links() }}
         </div>
     @else
-        <div class="card shadow">
-            <div class="card-body text-center py-5">
-                <i class="fas fa-bus fa-3x text-muted mb-3"></i>
-                <h5>No buses found</h5>
-                <p class="text-muted">Get started by adding your first bus to the fleet.</p>
-                <div class="mt-4">
-                    <a href="{{ route('operator.buses.create') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Add Your First Bus
+        <div class="bg-white shadow-lg rounded-xl border border-gray-200">
+            <div class="text-center py-12 px-6">
+                <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-bus text-gray-400 text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No buses found</h3>
+                <p class="text-gray-500 mb-6 max-w-sm mx-auto">Get started by adding your first bus to the fleet and begin managing your transportation services.</p>
+                <div>
+                    <a href="{{ route('operator.buses.create') }}"
+                       class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Your First Bus
                     </a>
                 </div>
             </div>

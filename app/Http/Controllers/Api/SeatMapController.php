@@ -28,10 +28,14 @@ class SeatMapController extends Controller
         // Get temporarily reserved seats
         $reservedSeats = $this->getReservedSeats($schedule->id);
 
-        foreach ($seatLayout['seats'] as &$seat) {
-            $seat['is_booked'] = in_array($seat['number'], $bookedSeats);
-            $seat['is_reserved'] = in_array($seat['number'], $reservedSeats);
-            $seat['is_available'] = !$seat['is_booked'] && !$seat['is_reserved'];
+        if (isset($seatLayout['seats']) && is_array($seatLayout['seats'])) {
+            foreach ($seatLayout['seats'] as &$seat) {
+                // Handle both 'number' and 'seat_number' keys for backward compatibility
+                $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
+                $seat['is_booked'] = $seatNumber ? in_array($seatNumber, $bookedSeats) : false;
+                $seat['is_reserved'] = $seatNumber ? in_array($seatNumber, $reservedSeats) : false;
+                $seat['is_available'] = !$seat['is_booked'] && !$seat['is_reserved'];
+            }
         }
 
         return response()->json([

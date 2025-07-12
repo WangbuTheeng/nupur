@@ -299,9 +299,13 @@ class SearchController extends Controller
             ->flatten()
             ->toArray();
 
-        foreach ($seatLayout['seats'] as &$seat) {
-            $seat['is_booked'] = in_array($seat['number'], $bookedSeats);
-            $seat['is_available'] = !$seat['is_booked'];
+        if (isset($seatLayout['seats']) && is_array($seatLayout['seats'])) {
+            foreach ($seatLayout['seats'] as &$seat) {
+                // Handle both 'number' and 'seat_number' keys for backward compatibility
+                $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
+                $seat['is_booked'] = $seatNumber ? in_array($seatNumber, $bookedSeats) : false;
+                $seat['is_available'] = !$seat['is_booked'];
+            }
         }
 
         return $seatLayout;

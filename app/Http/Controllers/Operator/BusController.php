@@ -152,8 +152,8 @@ class BusController extends Controller
             'upcoming_schedules' => $bus->schedules()->where('travel_date', '>=', Carbon::today())->count(),
             'total_bookings' => $bus->bookings()->count(),
             'monthly_revenue' => $bus->bookings()
-                ->where('status', 'confirmed')
-                ->whereMonth('created_at', Carbon::now()->month)
+                ->where('bookings.status', 'confirmed')
+                ->whereMonth('bookings.created_at', Carbon::now()->month)
                 ->sum('total_amount'),
         ];
 
@@ -247,7 +247,7 @@ class BusController extends Controller
         }
 
         // Check if bus has confirmed bookings
-        $confirmedBookings = $bus->bookings()->where('status', 'confirmed')->count();
+        $confirmedBookings = $bus->bookings()->where('bookings.status', 'confirmed')->count();
         if ($confirmedBookings > 0) {
             return back()->with('error', 'Cannot delete bus with confirmed bookings.');
         }
@@ -289,7 +289,7 @@ class BusController extends Controller
             for ($col = 1; $col <= $layout['columns']; $col++) {
                 if ($seatNumber <= $totalSeats) {
                     $seats[] = [
-                        'number' => $seatNumber,
+                        'seat_number' => $seatNumber,
                         'row' => $row,
                         'column' => $col,
                         'type' => $col <= 2 ? 'window' : 'aisle',
