@@ -31,6 +31,9 @@ Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->
     Route::get('buses/{bus}/maintenance', [BusController::class, 'maintenance'])->name('buses.maintenance');
     Route::post('buses/{bus}/maintenance', [BusController::class, 'storeMaintenance'])->name('buses.maintenance.store');
     Route::get('buses/{bus}/duplicate', [BusController::class, 'duplicate'])->name('buses.duplicate');
+    Route::post('buses/{bus}/seat-layout', [BusController::class, 'updateSeatLayout'])->name('buses.seat-layout.update');
+    Route::post('buses/preview-seat-layout', [BusController::class, 'previewSeatLayout'])->name('buses.seat-layout.preview');
+    Route::get('buses/preview-seat-layout', [BusController::class, 'showSeatLayoutPreview'])->name('buses.seat-layout.preview.show');
     
     // Schedule Management
     Route::resource('schedules', ScheduleController::class);

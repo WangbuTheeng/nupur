@@ -174,4 +174,65 @@ class Bus extends Model
 
         return $seats;
     }
+
+    /**
+     * Generate dynamic seat layout using SeatLayoutService.
+     */
+    public function generateDynamicSeatLayout($layoutType = '2x2', $hasBackRow = true)
+    {
+        $seatLayoutService = new \App\Services\SeatLayoutService();
+        return $seatLayoutService->generateSeatLayout($this->total_seats, $layoutType, $hasBackRow);
+    }
+
+    /**
+     * Update seat layout with new configuration.
+     */
+    public function updateSeatLayout($layoutType = '2x2', $hasBackRow = true)
+    {
+        $newLayout = $this->generateDynamicSeatLayout($layoutType, $hasBackRow);
+        $this->seat_layout = $newLayout;
+        $this->save();
+
+        return $newLayout;
+    }
+
+    /**
+     * Get seat layout with real-time booking status.
+     */
+    public function getSeatLayoutWithBookings($scheduleId = null)
+    {
+        $layout = $this->seat_layout;
+
+        if (!$layout || !isset($layout['seats'])) {
+            return $layout;
+        }
+
+        // Get booked seats for specific schedule if provided
+        if ($scheduleId) {
+            $bookedSeats = \App\Models\Schedule::find($scheduleId)
+                ?->bookings()
+                ->where('status', '!=', 'cancelled')
+                ->pluck('seat_numbers')
+                ->flatten()
+                ->toArray() ?? [];
+
+            // Update seat availability
+            foreach ($layout['seats'] as &$seat) {
+                $seatNumber = $seat['number'] ?? null;
+                $seat['is_booked'] = $seatNumber ? in_array($seatNumber, $bookedSeats) : false;
+                $seat['is_available'] = !$seat['is_booked'];
+            }
+        }
+
+        return $layout;
+    }
+
+    /**
+     * Validate seat layout configuration.
+     */
+    public function validateSeatLayout($layoutType, $hasBackRow = true)
+    {
+        $seatLayoutService = new \App\Services\SeatLayoutService();
+        return $seatLayoutService->validateLayout($this->total_seats, $layoutType, $hasBackRow);
+    }
 }

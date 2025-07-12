@@ -85,11 +85,70 @@
                                 </label>
                                 <input type="number" min="10" max="100"
                                        class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('total_seats') border-red-300 @enderror"
-                                       id="total_seats" name="total_seats" value="{{ old('total_seats') }}"
+                                       id="total_seats" name="total_seats" value="{{ old('total_seats', 31) }}"
                                        placeholder="e.g., 32" required>
                                 @error('total_seats')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
+                                <p class="text-xs text-gray-500 mt-1">Recommended: 27, 31, 35, or 39 seats</p>
+                            </div>
+                        </div>
+
+                        <!-- Seat Layout Configuration -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-blue-900 mb-3">Seat Layout Configuration</h4>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Layout Type <span class="text-red-500">*</span>
+                                    </label>
+                                    <div class="space-y-2">
+                                        <label class="flex items-center">
+                                            <input type="radio" name="layout_type" value="2x2"
+                                                   {{ old('layout_type', '2x2') == '2x2' ? 'checked' : '' }}
+                                                   class="text-green-600 focus:ring-green-500">
+                                            <span class="ml-2 text-sm">2x2 (Standard) - Most common</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="radio" name="layout_type" value="2x1"
+                                                   {{ old('layout_type') == '2x1' ? 'checked' : '' }}
+                                                   class="text-green-600 focus:ring-green-500">
+                                            <span class="ml-2 text-sm">2x1 (Compact) - Smaller buses</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="radio" name="layout_type" value="3x2"
+                                                   {{ old('layout_type') == '3x2' ? 'checked' : '' }}
+                                                   class="text-green-600 focus:ring-green-500">
+                                            <span class="ml-2 text-sm">3x2 (Large) - Larger buses</span>
+                                        </label>
+                                    </div>
+                                    @error('layout_type')
+                                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="has_back_row" value="1"
+                                               {{ old('has_back_row', true) ? 'checked' : '' }}
+                                               class="text-green-600 focus:ring-green-500 rounded">
+                                        <span class="ml-2">
+                                            <span class="text-sm font-medium text-gray-700">Include Back Row</span>
+                                            <span class="block text-xs text-gray-500">Continuous line of seats at the back</span>
+                                        </span>
+                                    </label>
+                                    @error('has_back_row')
+                                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+
+                                    <div class="mt-3 text-xs text-gray-600">
+                                        <p class="font-medium mb-1">Recommended configurations:</p>
+                                        <p>• 2x2: 27, 31, 35 seats</p>
+                                        <p>• 2x1: 21, 25, 29 seats</p>
+                                        <p>• 3x2: 35, 39, 45 seats</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

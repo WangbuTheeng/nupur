@@ -82,6 +82,8 @@ class BusController extends Controller
             'color' => 'required|string|max:50',
             'manufacture_year' => 'required|integer|min:1990|max:' . (date('Y') + 1),
             'total_seats' => 'required|integer|min:10|max:100',
+            'layout_type' => 'required|in:2x2,2x1,3x2',
+            'has_back_row' => 'boolean',
             'amenities' => 'nullable|array',
             'description' => 'nullable|string|max:500',
         ]);
@@ -99,7 +101,12 @@ class BusController extends Controller
                 'color' => $request->color,
                 'manufacture_year' => $request->manufacture_year,
                 'total_seats' => $request->total_seats,
-                'seat_layout' => $this->generateSeatLayout($request->total_seats, $busType),
+                'seat_layout' => $this->generateSeatLayout(
+                    $request->total_seats,
+                    $busType,
+                    $request->layout_type,
+                    $request->boolean('has_back_row', true)
+                ),
                 'amenities' => $request->amenities ?? [],
                 'description' => $request->description,
                 'is_active' => true,
@@ -192,17 +199,24 @@ class BusController extends Controller
             'color' => 'required|string|max:50',
             'manufacture_year' => 'required|integer|min:1990|max:' . (date('Y') + 1),
             'total_seats' => 'required|integer|min:10|max:100',
+            'layout_type' => 'nullable|in:2x2,2x1,3x2',
+            'has_back_row' => 'boolean',
             'amenities' => 'nullable|array',
             'description' => 'nullable|string|max:500',
         ]);
 
         DB::beginTransaction();
         try {
-            // If seat count changed, regenerate seat layout
+            // If seat count or layout changed, regenerate seat layout
             $seatLayout = $bus->seat_layout;
-            if ($request->total_seats != $bus->total_seats) {
+            $layoutType = $request->layout_type ?? ($bus->seat_layout['layout_type'] ?? '2x2');
+            $hasBackRow = $request->boolean('has_back_row', $bus->seat_layout['has_back_row'] ?? true);
+
+            if ($request->total_seats != $bus->total_seats ||
+                $layoutType != ($bus->seat_layout['layout_type'] ?? '2x2') ||
+                $hasBackRow != ($bus->seat_layout['has_back_row'] ?? true)) {
                 $busType = BusType::findOrFail($request->bus_type_id);
-                $seatLayout = $this->generateSeatLayout($request->total_seats, $busType);
+                $seatLayout = $this->generateSeatLayout($request->total_seats, $busType, $layoutType, $hasBackRow);
             }
 
             $bus->update([
@@ -277,35 +291,131 @@ class BusController extends Controller
     /**
      * Generate seat layout based on total seats and bus type.
      */
-    private function generateSeatLayout($totalSeats, $busType)
+    private function generateSeatLayout($totalSeats, $busType, $layoutType = '2x2', $hasBackRow = true)
     {
-        $layout = $busType->seat_layout ?? ['rows' => 10, 'columns' => 4, 'aisle_position' => 2];
+        $seatLayoutService = new \App\Services\SeatLayoutService();
+        return $seatLayoutService->generateSeatLayout($totalSeats, $layoutType, $hasBackRow);
+    }
 
-        $rows = ceil($totalSeats / $layout['columns']);
-        $seats = [];
-
-        $seatNumber = 1;
-        for ($row = 1; $row <= $rows; $row++) {
-            for ($col = 1; $col <= $layout['columns']; $col++) {
-                if ($seatNumber <= $totalSeats) {
-                    $seats[] = [
-                        'seat_number' => $seatNumber,
-                        'row' => $row,
-                        'column' => $col,
-                        'type' => $col <= 2 ? 'window' : 'aisle',
-                        'is_available' => true,
-                    ];
-                    $seatNumber++;
-                }
-            }
+    /**
+     * Update bus seat layout configuration.
+     */
+    public function updateSeatLayout(Request $request, Bus $bus)
+    {
+        // Ensure operator can only update their own buses
+        if ($bus->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to bus.');
         }
 
-        return [
-            'rows' => $rows,
-            'columns' => $layout['columns'],
-            'aisle_position' => $layout['aisle_position'],
-            'seats' => $seats,
-        ];
+        $request->validate([
+            'layout_type' => 'required|in:2x2,2x1,3x2',
+            'has_back_row' => 'boolean',
+        ]);
+
+        $layoutType = $request->layout_type;
+        $hasBackRow = $request->boolean('has_back_row', true);
+
+        // Validate layout configuration
+        $errors = $bus->validateSeatLayout($layoutType, $hasBackRow);
+        if (!empty($errors)) {
+            return back()->withErrors(['layout' => $errors]);
+        }
+
+        // Update seat layout
+        $newLayout = $bus->updateSeatLayout($layoutType, $hasBackRow);
+
+        return back()->with('success', 'Seat layout updated successfully.');
+    }
+
+    /**
+     * Show seat layout preview page.
+     */
+    public function showSeatLayoutPreview()
+    {
+        // Get a sample bus for demonstration
+        $bus = Bus::where('operator_id', auth()->id())->first();
+
+        if (!$bus) {
+            // Create a sample layout for demonstration
+            $sampleLayout = [
+                'layout_type' => '2x2',
+                'total_seats' => 32,
+                'rows' => 8,
+                'columns' => 5,
+                'aisle_position' => 2,
+                'has_back_row' => true,
+                'back_row_seats' => 5,
+                'seats' => []
+            ];
+
+            // Generate sample seats
+            $seatNumber = 1;
+            for ($row = 1; $row <= 7; $row++) {
+                for ($col = 1; $col <= 5; $col++) {
+                    if ($col == 3) continue; // Skip aisle position
+
+                    $letter = chr(64 + $row); // A, B, C, etc.
+                    $number = $col > 3 ? $col - 1 : $col;
+
+                    $sampleLayout['seats'][] = [
+                        'number' => $letter . $number,
+                        'row' => $row,
+                        'column' => $col,
+                        'type' => 'regular',
+                        'is_window' => ($col == 1 || $col == 5),
+                        'is_aisle' => ($col == 2 || $col == 4),
+                        'is_available' => true,
+                        'side' => $col <= 2 ? 'left' : 'right'
+                    ];
+                }
+            }
+
+            // Add back row
+            for ($col = 1; $col <= 5; $col++) {
+                $sampleLayout['seats'][] = [
+                    'number' => 'H' . $col,
+                    'row' => 8,
+                    'column' => $col,
+                    'type' => 'back_row',
+                    'is_window' => ($col == 1 || $col == 5),
+                    'is_aisle' => false,
+                    'is_available' => true,
+                    'side' => 'back'
+                ];
+            }
+
+            $bus = (object) [
+                'bus_number' => 'DEMO-001',
+                'total_seats' => 32,
+                'seat_layout' => $sampleLayout
+            ];
+        }
+
+        return view('operator.buses.preview-seat-layout', compact('bus'));
+    }
+
+    /**
+     * Preview seat layout configuration.
+     */
+    public function previewSeatLayout(Request $request)
+    {
+        $request->validate([
+            'total_seats' => 'required|integer|min:10|max:60',
+            'layout_type' => 'required|in:2x2,2x1,3x2',
+            'has_back_row' => 'boolean',
+        ]);
+
+        $seatLayoutService = new \App\Services\SeatLayoutService();
+        $layout = $seatLayoutService->generateSeatLayout(
+            $request->total_seats,
+            $request->layout_type,
+            $request->boolean('has_back_row', true)
+        );
+
+        return response()->json([
+            'success' => true,
+            'layout' => $layout,
+        ]);
     }
 
     /**

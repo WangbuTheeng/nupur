@@ -206,6 +206,9 @@
                                 <div>
                                     <p class="text-xs text-gray-500">Capacity</p>
                                     <p class="text-sm font-semibold text-gray-900">{{ $bus->total_seats }} seats</p>
+                                    @if($bus->seat_layout && isset($bus->seat_layout['layout_type']))
+                                        <p class="text-xs text-blue-600 font-medium">{{ strtoupper($bus->seat_layout['layout_type']) }} Layout</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>

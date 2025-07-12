@@ -9,6 +9,32 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Demo route for seat layouts
+Route::get('/demo/seat-layouts', function () {
+    return view('demo.seat-layouts');
+})->name('demo.seat-layouts');
+
+// Debug route to check bus data
+Route::get('/debug/bus-data', function () {
+    $bus = App\Models\Bus::first();
+    if (!$bus) {
+        return response()->json(['error' => 'No buses found']);
+    }
+
+    return response()->json([
+        'bus_number' => $bus->bus_number,
+        'total_seats' => $bus->total_seats,
+        'seat_layout' => $bus->seat_layout,
+        'has_new_format' => isset($bus->seat_layout['layout_type']),
+        'seats_count' => count($bus->seat_layout['seats'] ?? [])
+    ]);
+});
+
+// Test route for seat layout rendering
+Route::get('/test/seat-layout', function () {
+    return view('test-seat-layout');
+});
+
 // Role-based dashboard routing
 Route::get('/dashboard', function () {
     $user = Auth::user();

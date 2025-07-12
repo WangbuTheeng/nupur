@@ -35,6 +35,11 @@ class SeatMapController extends Controller
                 $seat['is_booked'] = $seatNumber ? in_array($seatNumber, $bookedSeats) : false;
                 $seat['is_reserved'] = $seatNumber ? in_array($seatNumber, $reservedSeats) : false;
                 $seat['is_available'] = !$seat['is_booked'] && !$seat['is_reserved'];
+
+                // Ensure seat number is in 'number' field for frontend compatibility
+                if (!isset($seat['number']) && isset($seat['seat_number'])) {
+                    $seat['number'] = $seat['seat_number'];
+                }
             }
         }
 
