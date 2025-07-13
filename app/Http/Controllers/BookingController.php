@@ -33,8 +33,12 @@ class BookingController extends Controller
     {
         $schedule->load(['bus.busType', 'bus.seats', 'route']);
         
-        if (!$schedule->isBookable()) {
-            return redirect()->route('search')->with('error', 'This schedule is not available for booking.');
+        if (!$schedule->isBookableOnline()) {
+            $message = $schedule->hasFinished()
+                ? 'This schedule has already departed and is no longer available for booking.'
+                : 'Online booking for this schedule has closed. Please visit the counter for booking.';
+
+            return redirect()->route('search')->with('error', $message);
         }
 
         // Get available seats
@@ -65,8 +69,12 @@ class BookingController extends Controller
             'special_requests' => 'nullable|string|max:500',
         ]);
 
-        if (!$schedule->isBookable()) {
-            return back()->with('error', 'This schedule is not available for booking.');
+        if (!$schedule->isBookableOnline()) {
+            $message = $schedule->hasFinished()
+                ? 'This schedule has already departed and is no longer available for booking.'
+                : 'Online booking for this schedule has closed. Please visit the counter for booking.';
+
+            return back()->with('error', $message);
         }
 
         // Validate seat availability

@@ -88,6 +88,22 @@ class BusController extends Controller
             'description' => 'nullable|string|max:500',
         ]);
 
+        // Validate seat count for the specific layout type
+        $layoutType = $request->layout_type;
+        $totalSeats = $request->total_seats;
+
+        if (!\App\Services\SeatLayoutService::isValidSeatCount($totalSeats, $layoutType)) {
+            $validCounts = \App\Services\SeatLayoutService::getValidSeatCounts($layoutType);
+            $validCountsStr = implode(', ', array_slice($validCounts, 0, 10));
+            if (count($validCounts) > 10) {
+                $validCountsStr .= '...';
+            }
+
+            return back()->withErrors([
+                'total_seats' => "Invalid seat count for {$layoutType} layout. Valid counts: {$validCountsStr}"
+            ])->withInput();
+        }
+
         $busType = BusType::findOrFail($request->bus_type_id);
 
         DB::beginTransaction();
@@ -205,11 +221,26 @@ class BusController extends Controller
             'description' => 'nullable|string|max:500',
         ]);
 
+        // Validate seat count for the specific layout type
+        $layoutType = $request->layout_type ?? ($bus->seat_layout['layout_type'] ?? '2x2');
+        $totalSeats = $request->total_seats;
+
+        if (!\App\Services\SeatLayoutService::isValidSeatCount($totalSeats, $layoutType)) {
+            $validCounts = \App\Services\SeatLayoutService::getValidSeatCounts($layoutType);
+            $validCountsStr = implode(', ', array_slice($validCounts, 0, 10));
+            if (count($validCounts) > 10) {
+                $validCountsStr .= '...';
+            }
+
+            return back()->withErrors([
+                'total_seats' => "Invalid seat count for {$layoutType} layout. Valid counts: {$validCountsStr}"
+            ])->withInput();
+        }
+
         DB::beginTransaction();
         try {
             // If seat count or layout changed, regenerate seat layout
             $seatLayout = $bus->seat_layout;
-            $layoutType = $request->layout_type ?? ($bus->seat_layout['layout_type'] ?? '2x2');
             $hasBackRow = $request->boolean('has_back_row', $bus->seat_layout['has_back_row'] ?? true);
 
             if ($request->total_seats != $bus->total_seats ||
@@ -295,6 +326,24 @@ class BusController extends Controller
     {
         $seatLayoutService = new \App\Services\SeatLayoutService();
         return $seatLayoutService->generateSeatLayout($totalSeats, $layoutType, $hasBackRow);
+    }
+
+    private function calculateTotalSeats($layoutType, $hasBackRow)
+    {
+        $configs = \App\Services\SeatLayoutService::LAYOUT_CONFIGS;
+        $config = $configs[$layoutType];
+        
+        // This is a simplified calculation. You might want to make this more robust.
+        // For now, we'll use a predefined number of rows for simplicity.
+        $rows = 8; 
+        
+        $totalSeats = $rows * $config['total_per_row'];
+        
+        if ($hasBackRow) {
+            $totalSeats += $config['back_row_seats'] - $config['total_per_row'];
+        }
+        
+        return $totalSeats;
     }
 
     /**
@@ -395,6 +444,24 @@ class BusController extends Controller
     }
 
     /**
+     * Get valid seat counts for a layout type.
+     */
+    public function getValidSeatCounts(Request $request)
+    {
+        $request->validate([
+            'layout_type' => 'required|in:2x2,2x1,3x2',
+        ]);
+
+        $validCounts = \App\Services\SeatLayoutService::getValidSeatCounts($request->layout_type);
+
+        return response()->json([
+            'success' => true,
+            'valid_counts' => $validCounts,
+            'layout_type' => $request->layout_type,
+        ]);
+    }
+
+    /**
      * Preview seat layout configuration.
      */
     public function previewSeatLayout(Request $request)
@@ -404,6 +471,23 @@ class BusController extends Controller
             'layout_type' => 'required|in:2x2,2x1,3x2',
             'has_back_row' => 'boolean',
         ]);
+
+        // Validate seat count for the specific layout type
+        $layoutType = $request->layout_type;
+        $totalSeats = $request->total_seats;
+
+        if (!\App\Services\SeatLayoutService::isValidSeatCount($totalSeats, $layoutType)) {
+            $validCounts = \App\Services\SeatLayoutService::getValidSeatCounts($layoutType);
+            $validCountsStr = implode(', ', array_slice($validCounts, 0, 10));
+            if (count($validCounts) > 10) {
+                $validCountsStr .= '...';
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => "Invalid seat count for {$layoutType} layout. Valid counts: {$validCountsStr}"
+            ], 422);
+        }
 
         $seatLayoutService = new \App\Services\SeatLayoutService();
         $layout = $seatLayoutService->generateSeatLayout(

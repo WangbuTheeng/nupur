@@ -88,7 +88,7 @@ class SearchController extends Controller
                 ->with('error', 'No routes available for the selected cities.');
         }
 
-        // Find available schedules
+        // Find available schedules (only show schedules that haven't finished)
         $query = Schedule::with([
                 'route.sourceCity',
                 'route.destinationCity',
@@ -97,7 +97,7 @@ class SearchController extends Controller
             ])
             ->whereIn('route_id', $routes)
             ->whereDate('travel_date', $request->travel_date)
-            ->where('status', 'scheduled')
+            ->bookableOnline() // Only show schedules bookable online for customers
             ->where('available_seats', '>=', $passengers);
 
         // Apply filters

@@ -70,15 +70,15 @@
 }
 
 .seat.selected {
-    background: #3b82f6;
+    background: #eab308;
     color: white;
-    border-color: #2563eb;
+    border-color: #ca8a04;
     animation: pulse 1.5s infinite;
 }
 
 .seat.selected:hover {
-    background: #2563eb;
-    border-color: #1d4ed8;
+    background: #ca8a04;
+    border-color: #a16207;
 }
 
 .seat.booked {
@@ -94,9 +94,9 @@
 }
 
 .seat.reserved {
-    background: #f59e0b;
+    background: #6b7280;
     color: white;
-    border-color: #d97706;
+    border-color: #4b5563;
     cursor: not-allowed;
 }
 
@@ -240,16 +240,45 @@
         align-items: center;
         gap: 10px;
     }
-    
+
     .seat-grid {
         gap: 4px;
         padding: 10px;
     }
-    
+
     .seat {
-        width: 30px;
+        width: 28px;
+        height: 28px;
+        font-size: 9px;
+    }
+
+    .aisle-space {
+        width: 20px;
+        min-height: 28px;
+    }
+
+    .bus-layout-container {
+        padding: 8px;
+        max-width: 100%;
+    }
+
+    .bus-frame {
+        padding: 8px;
+        border-width: 2px;
+    }
+
+    .seat-row {
+        gap: 3px;
+    }
+
+    .back-row-container {
+        gap: 2px;
+    }
+
+    .bus-door, .driver-seat {
+        font-size: 16px;
+        min-width: 35px;
         height: 30px;
-        font-size: 10px;
     }
 }
 
@@ -497,25 +526,25 @@
     }
     
     .seat.available {
-        background: #000;
+        background: #00aa00;
         color: #fff;
         border-color: #fff;
     }
-    
+
     .seat.selected {
-        background: #0066cc;
-        color: #fff;
+        background: #ffaa00;
+        color: #000;
         border-color: #fff;
     }
-    
+
     .seat.booked {
         background: #cc0000;
         color: #fff;
         border-color: #fff;
     }
-    
+
     .seat.reserved {
-        background: #cc6600;
+        background: #666666;
         color: #fff;
         border-color: #fff;
     }

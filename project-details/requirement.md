@@ -196,3 +196,8 @@ PDF Ticket Generation: Use DomPDF or Snappy PDF
 
 Festival Mode: Enable custom schedules with price hike for specific dates
 
+
+
+i think while creating the seats, it should give restiction of specific layout like for example, if the 2x2 layout is selected, it should only created like 25, 29, 33, 37, 41, etc not than others seats numbers,
+similiar to !x2 layout it should only created 22, 25, 28, 31, 34, etc not than others seats numbers,
+similar to 3X2 layout, it should only created 26,31, 36,41, 46 etc not than others seats numbers

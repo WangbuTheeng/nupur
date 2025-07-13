@@ -84,6 +84,18 @@ class BookingController extends Controller
 
         $schedule = Schedule::findOrFail($request->schedule_id);
 
+        // Check if schedule is still bookable online
+        if (!$schedule->isBookableOnline()) {
+            $message = $schedule->hasFinished()
+                ? 'This schedule has already departed and is no longer available for booking.'
+                : 'Online booking for this schedule has closed. Please visit the counter for booking.';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
+        }
+
         // Check seat availability
         $requestedSeats = $request->seat_numbers;
         $bookedSeats = $schedule->bookings()

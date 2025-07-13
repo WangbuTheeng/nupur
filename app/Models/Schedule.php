@@ -25,8 +25,6 @@ class Schedule extends Model
 
     protected $casts = [
         'travel_date' => 'date',
-        'departure_time' => 'datetime:H:i:s',
-        'arrival_time' => 'datetime:H:i:s',
         'fare' => 'decimal:2'
     ];
 
@@ -63,13 +61,108 @@ class Schedule extends Model
     }
 
     /**
-     * Check if the schedule is bookable.
+     * Check if the schedule is bookable (general check).
      */
     public function isBookable()
     {
         return $this->status === 'scheduled' &&
                $this->available_seats > 0 &&
-               $this->travel_date >= Carbon::today();
+               !$this->hasFinished();
+    }
+
+    /**
+     * Check if the schedule is bookable online (customer booking).
+     * Online booking closes 10 minutes before departure.
+     */
+    public function isBookableOnline()
+    {
+        if (!$this->isBookable()) {
+            return false;
+        }
+
+        $now = Carbon::now();
+        $departureDateTime = $this->departure_datetime;
+        $bookingCutoff = $departureDateTime->subMinutes(10);
+
+        return $now <= $bookingCutoff;
+    }
+
+    /**
+     * Check if the schedule is bookable via counter.
+     * Counter booking is allowed until departure time.
+     */
+    public function isBookableViaCounter()
+    {
+        if (!$this->isBookable()) {
+            return false;
+        }
+
+        $now = Carbon::now();
+        $departureDateTime = $this->departure_datetime;
+
+        return $now <= $departureDateTime;
+    }
+
+    /**
+     * Check if the schedule has finished (departed).
+     */
+    public function hasFinished()
+    {
+        $now = Carbon::now();
+        $departureDateTime = $this->departure_datetime;
+
+        return $now > $departureDateTime;
+    }
+
+    /**
+     * Check if online booking is closed but counter booking is still available.
+     */
+    public function isInCounterOnlyPeriod()
+    {
+        return !$this->isBookableOnline() && $this->isBookableViaCounter();
+    }
+
+    /**
+     * Get minutes until departure.
+     */
+    public function getMinutesUntilDepartureAttribute()
+    {
+        $now = Carbon::now();
+        $departureDateTime = $this->departure_datetime;
+
+        if ($now > $departureDateTime) {
+            return 0; // Already departed
+        }
+
+        return $now->diffInMinutes($departureDateTime);
+    }
+
+    /**
+     * Get booking status for display.
+     */
+    public function getBookingStatusAttribute()
+    {
+        if ($this->hasFinished()) {
+            return 'finished';
+        }
+
+        if ($this->status !== 'scheduled') {
+            return 'not_available';
+        }
+
+        if ($this->available_seats <= 0) {
+            return 'sold_out';
+        }
+
+        if ($this->isBookableOnline()) {
+            return 'available_online';
+        }
+
+        if ($this->isBookableViaCounter()) {
+            return 'counter_only';
+        }
+
+        return 'not_available';
     }
 
     /**
@@ -88,7 +181,7 @@ class Schedule extends Model
         $arrivalDate = $this->travel_date;
 
         // If arrival time is earlier than departure time, it's next day
-        if ($this->arrival_time < $this->departure_time) {
+        if ($this->departure_time && $this->arrival_time && $this->arrival_time < $this->departure_time) {
             $arrivalDate = $arrivalDate->addDay();
         }
 
@@ -140,13 +233,41 @@ class Schedule extends Model
     }
 
     /**
-     * Scope to get bookable schedules.
+     * Scope to get bookable schedules (general).
      */
     public function scopeBookable($query)
     {
         return $query->where('status', 'scheduled')
                     ->where('available_seats', '>', 0)
-                    ->where('travel_date', '>=', Carbon::today());
+                    ->whereRaw("CONCAT(travel_date, ' ', departure_time) > NOW()");
+    }
+
+    /**
+     * Scope to get schedules bookable online (excludes those within 10 minutes of departure).
+     */
+    public function scopeBookableOnline($query)
+    {
+        return $query->where('status', 'scheduled')
+                    ->where('available_seats', '>', 0)
+                    ->whereRaw("CONCAT(travel_date, ' ', departure_time) > DATE_ADD(NOW(), INTERVAL 10 MINUTE)");
+    }
+
+    /**
+     * Scope to get schedules bookable via counter (until departure time).
+     */
+    public function scopeBookableViaCounter($query)
+    {
+        return $query->where('status', 'scheduled')
+                    ->where('available_seats', '>', 0)
+                    ->whereRaw("CONCAT(travel_date, ' ', departure_time) > NOW()");
+    }
+
+    /**
+     * Scope to get schedules that are not finished.
+     */
+    public function scopeNotFinished($query)
+    {
+        return $query->whereRaw("CONCAT(travel_date, ' ', departure_time) > NOW()");
     }
 
     /**
@@ -168,5 +289,31 @@ class Schedule extends Model
         $baseFare = $this->route->base_fare;
         $multiplier = $this->bus->busType->base_fare_multiplier;
         return $baseFare * $multiplier;
+    }
+
+    /**
+     * Auto-update schedule status based on time.
+     * This can be called periodically or on access.
+     */
+    public function updateStatusBasedOnTime()
+    {
+        if ($this->status === 'scheduled' && $this->hasFinished()) {
+            $this->update(['status' => 'departed']);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Scope to auto-update statuses for finished schedules.
+     */
+    public function scopeWithUpdatedStatuses($query)
+    {
+        // Update all scheduled schedules that have finished
+        $query->where('status', 'scheduled')
+              ->whereRaw("CONCAT(travel_date, ' ', departure_time) <= NOW()")
+              ->update(['status' => 'departed']);
+
+        return $query;
     }
 }

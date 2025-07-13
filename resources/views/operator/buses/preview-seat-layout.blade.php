@@ -237,21 +237,16 @@ function renderBusLayout(seatData, containerId) {
             const maxColumn = Math.max(...rowSeats.map(s => s.column));
             
             for (let col = 1; col <= maxColumn; col++) {
-                // Add aisle space before right side seats
-                if (col === aislePosition + 1) {
-                    html += '<div class="aisle-space">|</div>';
-                }
-                
                 // Find seat for this column
                 const seat = rowSeats.find(s => s.column === col);
                 if (seat) {
                     const seatClass = seat.is_window ? 'seat window-seat' : 'seat available';
                     const windowText = seat.is_window ? ' (Window)' : '';
-                    
+
                     html += `<div class="${seatClass}" title="Seat ${seat.number}${windowText}">${seat.number}</div>`;
                 } else {
-                    // Empty space for missing seats
-                    html += '<div style="width: 36px; height: 36px;"></div>';
+                    // This is an aisle position - render aisle space
+                    html += '<div class="aisle-space">|</div>';
                 }
             }
         }

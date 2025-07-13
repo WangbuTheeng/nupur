@@ -261,22 +261,58 @@
 
                                             <div class="space-y-2">
                                                 @auth
-                                                    @if($schedule->available_seats >= $searchParams['passengers'])
-                                                        <a href="{{ route('booking.seat-selection', $schedule) }}" 
-                                                           class="block w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center transition-colors duration-200">
-                                                            Select Seats
-                                                        </a>
-                                                    @else
-                                                        <button disabled 
+                                                    @if($schedule->hasFinished())
+                                                        <button disabled
+                                                                class="block w-full bg-red-300 text-red-700 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
+                                                            Departed
+                                                        </button>
+                                                        <div class="text-xs text-red-600 text-center">
+                                                            This bus has already departed
+                                                        </div>
+                                                    @elseif(!$schedule->isBookableOnline())
+                                                        <button disabled
+                                                                class="block w-full bg-orange-300 text-orange-700 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
+                                                            Counter Only
+                                                        </button>
+                                                        <div class="text-xs text-orange-600 text-center">
+                                                            Online booking closed. Visit counter to book.
+                                                        </div>
+                                                    @elseif($schedule->available_seats < $searchParams['passengers'])
+                                                        <button disabled
                                                                 class="block w-full bg-gray-300 text-gray-500 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
                                                             Not Available
                                                         </button>
+                                                        <div class="text-xs text-gray-500 text-center">
+                                                            Not enough seats available
+                                                        </div>
+                                                    @else
+                                                        <a href="{{ route('booking.seat-selection', $schedule) }}"
+                                                           class="block w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center transition-colors duration-200">
+                                                            Select Seats
+                                                        </a>
+                                                        @if($schedule->minutes_until_departure <= 30)
+                                                            <div class="text-xs text-orange-600 text-center">
+                                                                ⚠️ Departing in {{ $schedule->minutes_until_departure }} minutes
+                                                            </div>
+                                                        @endif
                                                     @endif
                                                 @else
-                                                    <a href="{{ route('login') }}" 
-                                                       class="block w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center transition-colors duration-200">
-                                                        Login to Book
-                                                    </a>
+                                                    @if($schedule->hasFinished())
+                                                        <button disabled
+                                                                class="block w-full bg-red-300 text-red-700 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
+                                                            Departed
+                                                        </button>
+                                                    @elseif(!$schedule->isBookableOnline())
+                                                        <button disabled
+                                                                class="block w-full bg-orange-300 text-orange-700 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
+                                                            Counter Only
+                                                        </button>
+                                                    @else
+                                                        <a href="{{ route('login') }}"
+                                                           class="block w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center transition-colors duration-200">
+                                                            Login to Book
+                                                        </a>
+                                                    @endif
                                                 @endauth
                                                 
                                                 <a href="{{ route('search.schedule', $schedule) }}" 

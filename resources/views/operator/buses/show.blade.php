@@ -227,6 +227,9 @@
                                         <button onclick="renderSimpleSeatLayout(@json($bus->seat_layout), 'seatLayoutDisplay')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                                             🔄 Reload Seat Layout
                                         </button>
+                                        <button onclick="regenerateSeatLayout({{ $bus->id }})" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm ml-2">
+                                            🔧 Regenerate Layout
+                                        </button>
                                         <button onclick="console.clear()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm ml-2">
                                             🗑️ Clear Console
                                         </button>
@@ -539,605 +542,170 @@
 
 @push('styles')
 <style>
-/* Inline seat map styles to ensure they always load */
-.seat-map-container {
-    max-width: 700px;
-    margin: 0 auto;
-    padding: 20px;
-    background: #f8fafc;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.bus-layout-container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 15px;
-}
-
-.bus-frame {
-    background: linear-gradient(to bottom, #f8fafc, #e2e8f0);
-    border: 3px solid #475569;
-    border-radius: 25px;
-    padding: 15px;
-    position: relative;
-    min-height: 300px;
-}
-
-.bus-top-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 8px 15px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 15px;
-    border: 2px solid #cbd5e1;
-}
-
-.bus-door {
-    background: #3b82f6;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.driver-seat {
-    background: #10b981;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.main-seating-area {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    align-items: center;
-    width: 100%;
-}
-
-.seat-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 40px;
-}
-
-.seat {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.seat.available {
-    background: #22c55e;
-    color: white;
-}
-
-.seat.window-seat {
-    background: #3b82f6;
-    color: white;
-}
-
-.seat.back-row-seat {
-    background: #8b5cf6;
-    color: white;
-}
-
-.aisle-space {
-    width: 24px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6b7280;
-    font-size: 16px;
-    font-weight: bold;
-    background: rgba(107, 114, 128, 0.1);
-    border-radius: 4px;
-}
-
-.back-row-container {
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    background: rgba(139, 92, 246, 0.1);
-    padding: 8px;
-    border-radius: 12px;
-    border: 2px dashed #8b5cf6;
-}
+    .bus-frame {
+        background: #f0f4f8;
+        border: 2px solid #a0aec0;
+        border-radius: 20px;
+        padding: 20px;
+        max-width: 400px;
+        margin: auto;
+    }
+    .bus-top-section {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    .bus-door, .driver-seat {
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+        color: white;
+    }
+    .bus-door { background-color: #4299e1; }
+    .driver-seat { background-color: #48bb78; }
+    .main-seating-area {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .seat-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+    }
+    .seat {
+        width: 40px;
+        height: 40px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+    }
+    .seat.available { background-color: #68d391; }
+    .seat.window-seat { background-color: #63b3ed; }
+    .seat.back-row-seat { background-color: #a78bfa; }
+    .aisle-space { width: 20px; }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-console.log('🚀 Seat Layout Script Loading...');
+    function renderSeatLayout(seatData, containerId) {
+        console.log('🚌 Rendering seat layout for:', containerId);
+        console.log('📊 Seat data:', seatData);
 
-// Simple and robust seat layout renderer
-function renderBusLayout(seatData, containerId) {
-    console.log('🚀 Starting renderBusLayout function...');
-    console.log('🚌 Rendering bus layout for container:', containerId);
-    console.log('📊 Seat data:', seatData);
-
-    // Debug: Show seat arrangement
-    console.log('🔍 Layout details:');
-    console.log('  - Layout type:', seatData.layout_type);
-    console.log('  - Total seats:', seatData.total_seats);
-    console.log('  - Rows:', seatData.rows);
-    console.log('  - Columns:', seatData.columns);
-    console.log('  - Aisle position:', seatData.aisle_position);
-    console.log('  - Has back row:', seatData.has_back_row);
-
-    // Debug: Show first few seats to understand data format
-    if (seats.length > 0) {
-        console.log('🔍 First 3 seats (raw data):');
-        seats.slice(0, 3).forEach((seat, i) => {
-            console.log(`  Seat ${i + 1}:`, {
-                number: seat.number,
-                seat_number: seat.seat_number,
-                row: seat.row,
-                column: seat.column,
-                is_window: seat.is_window
-            });
-        });
-    }
-
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error('❌ Container not found:', containerId);
-        return false;
-    }
-
-    const seats = seatData.seats || [];
-    const layoutType = seatData.layout_type || '2x2';
-    const hasBackRow = seatData.has_back_row || false;
-    const aislePosition = seatData.aisle_position || 2;
-
-    // Create the complete layout HTML
-    let html = `
-        <div class="seat-map-container">
-            <div class="bus-layout-container">
-                <div class="bus-frame">
-                    <!-- Top section with door and driver -->
-                    <div class="bus-top-section">
-                        <div class="bus-door" title="Front Door">🚪 Door</div>
-                        <div class="driver-seat" title="Driver">👨‍✈️ Driver</div>
-                    </div>
-
-                    <!-- Main seating area -->
-                    <div class="main-seating-area">
-    `;
-
-    // Normalize seat data format (handle both old and new formats)
-    seats.forEach(seat => {
-        // Ensure 'number' property exists (handle both 'number' and 'seat_number')
-        if (!seat.number && seat.seat_number) {
-            seat.number = seat.seat_number;
-        }
-        // Ensure row and column are numbers
-        seat.row = parseInt(seat.row) || 1;
-        seat.column = parseInt(seat.column) || 1;
-    });
-
-    // Group seats by row
-    const seatsByRow = {};
-    seats.forEach(seat => {
-        if (!seatsByRow[seat.row]) seatsByRow[seat.row] = [];
-        seatsByRow[seat.row].push(seat);
-    });
-
-    let maxRow = Math.max(...seats.map(s => s.row));
-
-    // Debug: Show seat arrangement
-    console.log('🗺️ Seat arrangement by row:');
-    console.log('Total rows found:', maxRow);
-    console.log('Seats by row object:', seatsByRow);
-
-    // Validate maxRow
-    if (!maxRow || maxRow < 1) {
-        console.error('❌ Invalid maxRow:', maxRow);
-        maxRow = 8; // fallback
-    }
-
-    for (let r = 1; r <= maxRow; r++) {
-        const rowSeats = seatsByRow[r] || [];
-        console.log(`  Row ${r} (${rowSeats.length} seats):`, rowSeats.map(s => `${s.number}(R${s.row},C${s.column}${s.is_window ? 'W' : ''})`).join(', '));
-    }
-
-    // Check if all seats are in the same row (common issue)
-    const allRows = seats.map(s => s.row);
-    const uniqueRows = [...new Set(allRows)];
-    console.log('All seat rows:', allRows);
-    console.log('Unique rows:', uniqueRows);
-
-    if (uniqueRows.length === 1) {
-        console.warn('⚠️ WARNING: All seats are in the same row! Fixing layout...');
-
-        // Fix the layout by redistributing seats across rows
-        const seatsPerRow = layoutType === '2x1' ? 3 : (layoutType === '2x2' ? 4 : 5);
-        const totalRegularSeats = hasBackRow ? seats.length - (seatData.back_row_seats || 5) : seats.length;
-        const numberOfRows = Math.ceil(totalRegularSeats / seatsPerRow);
-
-        console.log(`Redistributing ${totalRegularSeats} regular seats across ${numberOfRows} rows (${seatsPerRow} seats per row)`);
-
-        // Redistribute seats
-        seats.forEach((seat, index) => {
-            if (index < totalRegularSeats) {
-                // Regular seats
-                const newRow = Math.floor(index / seatsPerRow) + 1;
-                const newCol = (index % seatsPerRow) + 1;
-
-                // Adjust column for aisle
-                const adjustedCol = newCol > aislePosition ? newCol + 1 : newCol;
-
-                seat.row = newRow;
-                seat.column = adjustedCol;
-                seat.is_window = (adjustedCol === 1 || adjustedCol === (seatData.columns || 5));
-            } else {
-                // Back row seats
-                seat.row = numberOfRows + 1;
-                seat.column = (index - totalRegularSeats) + 1;
-                seat.type = 'back_row';
-            }
-        });
-
-        // Rebuild seatsByRow with fixed data
-        const fixedSeatsByRow = {};
-        seats.forEach(seat => {
-            if (!fixedSeatsByRow[seat.row]) fixedSeatsByRow[seat.row] = [];
-            fixedSeatsByRow[seat.row].push(seat);
-        });
-
-        // Update variables
-        Object.assign(seatsByRow, fixedSeatsByRow);
-        const newMaxRow = Math.max(...seats.map(s => s.row));
-
-        console.log('✅ Layout fixed! New arrangement:');
-        for (let r = 1; r <= newMaxRow; r++) {
-            const rowSeats = seatsByRow[r] || [];
-            console.log(`  Row ${r}:`, rowSeats.map(s => `${s.number}(R${s.row},C${s.column})`).join(', '));
-        }
-
-        // Update maxRow for rendering
-        maxRow = newMaxRow;
-    }
-
-    // Render each row
-    for (let rowNum = 1; rowNum <= maxRow; rowNum++) {
-        const rowSeats = (seatsByRow[rowNum] || []).sort((a, b) => a.column - b.column);
-        const isBackRow = hasBackRow && rowNum === maxRow;
-
-        if (rowSeats.length === 0) continue; // Skip empty rows
-
-        html += `<div class="seat-row" data-row="${rowNum}">`;
-
-        if (isBackRow) {
-            // Back row - continuous seats across full width
-            html += '<div class="back-row-container">';
-            rowSeats.forEach(seat => {
-                const seatNumber = seat.number || seat.seat_number || `BR${seat.column}`;
-                html += `<div class="seat back-row-seat" title="Seat ${seatNumber}">${seatNumber}</div>`;
-            });
-            html += '</div>';
-        } else {
-            // Regular row - arrange seats by column position
-            const maxColumn = Math.max(...rowSeats.map(s => s.column));
-
-            for (let col = 1; col <= maxColumn; col++) {
-                // Add aisle space before right side seats
-                if (col === aislePosition + 1) {
-                    html += '<div class="aisle-space">|</div>';
-                }
-
-                // Find seat for this column
-                const seat = rowSeats.find(s => s.column === col);
-                if (seat) {
-                    const seatClass = seat.is_window ? 'seat window-seat' : 'seat available';
-                    const windowText = seat.is_window ? ' (Window)' : '';
-                    const seatNumber = seat.number || seat.seat_number || `${col}`;
-
-                    html += `<div class="${seatClass}" title="Seat ${seatNumber}${windowText}">${seatNumber}</div>`;
-                } else {
-                    // Empty space for missing seats
-                    html += '<div style="width: 36px; height: 36px;"></div>';
-                }
-            }
-        }
-
-        html += '</div>';
-    }
-
-    html += `
-                    </div>
-
-                    <!-- Layout info -->
-                    <div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255,255,255,0.8); border-radius: 8px; font-size: 12px; color: #6b7280;">
-                        <strong>${layoutType.toUpperCase()}</strong> Layout • <strong>${seats.length}</strong> Seats • ${hasBackRow ? 'With' : 'Without'} Back Row
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    try {
-        container.innerHTML = html;
-        console.log('✅ Bus layout rendered successfully!');
-        console.log('📏 Final HTML length:', html.length);
-        console.log('🎯 Rendered rows:', maxRow);
-        return true;
-    } catch (error) {
-        console.error('❌ Error setting innerHTML:', error);
-        console.log('🔄 Trying simple fallback renderer...');
-        return renderSimpleSeatLayout(seatData, containerId);
-    }
-}
-
-// Simple fallback renderer
-function renderSimpleSeatLayout(seatData, containerId) {
-    console.log('🔧 Using simple fallback renderer...');
-
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error('❌ Container not found:', containerId);
-        return false;
-    }
-
-    const seats = seatData.seats || [];
-    const layoutType = seatData.layout_type || '2x2';
-
-    let html = `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; border-radius: 12px;">
-            <div style="background: #e2e8f0; border: 3px solid #475569; border-radius: 25px; padding: 15px;">
-                <!-- Top section -->
-                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; padding: 8px; background: rgba(255,255,255,0.7); border-radius: 15px;">
-                    <div style="background: #3b82f6; color: white; padding: 8px 12px; border-radius: 8px;">🚪 Door</div>
-                    <div style="background: #10b981; color: white; padding: 8px 12px; border-radius: 8px;">👨‍✈️ Driver</div>
-                </div>
-
-                <!-- Simple seat grid -->
-                <div style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
-    `;
-
-    // Group seats by row
-    const seatsByRow = {};
-    seats.forEach(seat => {
-        const row = parseInt(seat.row) || 1;
-        if (!seatsByRow[row]) seatsByRow[row] = [];
-        seatsByRow[row].push(seat);
-    });
-
-    const maxRow = Math.max(...Object.keys(seatsByRow).map(r => parseInt(r)));
-
-    // Render each row
-    for (let row = 1; row <= maxRow; row++) {
-        const rowSeats = (seatsByRow[row] || []).sort((a, b) => (a.column || 1) - (b.column || 1));
-
-        html += '<div style="display: flex; gap: 6px; justify-content: center;">';
-
-        rowSeats.forEach((seat, index) => {
-            const seatNumber = seat.number || seat.seat_number || `${row}-${index + 1}`;
-            const isWindow = seat.is_window;
-            const bgColor = isWindow ? '#3b82f6' : '#22c55e';
-
-            // Add aisle space after 2nd seat for 2x2 layout
-            if (index === 2 && layoutType === '2x2') {
-                html += '<div style="width: 20px; display: flex; align-items: center; justify-content: center; color: #6b7280;">|</div>';
-            }
-
-            html += `<div style="
-                width: 36px;
-                height: 36px;
-                background: ${bgColor};
-                color: white;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 600;
-                font-size: 11px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            " title="Seat ${seatNumber}">${seatNumber}</div>`;
-        });
-
-        html += '</div>';
-    }
-
-    html += `
-                </div>
-
-                <!-- Info -->
-                <div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255,255,255,0.8); border-radius: 8px; font-size: 12px; color: #6b7280;">
-                    <strong>${layoutType.toUpperCase()}</strong> Layout • <strong>${seats.length}</strong> Seats
-                </div>
-            </div>
-        </div>
-    `;
-
-    container.innerHTML = html;
-    console.log('✅ Simple layout rendered successfully!');
-    return true;
-}
-</script>
-<script>
-// Force immediate rendering - try simple approach first
-console.log('🚀 Script loaded, starting immediate rendering...');
-
-@if($bus->seat_layout)
-    const seatData = @json($bus->seat_layout);
-    console.log('📊 Seat data loaded:', seatData);
-
-    // Try simple renderer immediately
-    function trySimpleRender() {
-        console.log('🎯 Trying simple renderer...');
-        const container = document.getElementById('seatLayoutDisplay');
+        const container = document.getElementById(containerId);
         if (!container) {
-            console.log('❌ Container not found yet');
-            return false;
+            console.error('❌ Container not found:', containerId);
+            return;
         }
 
-        return renderSimpleSeatLayout(seatData, 'seatLayoutDisplay');
-    }
+        const { seats, has_back_row, layout_type, aisle_position } = seatData;
 
-    // Try immediately
-    if (!trySimpleRender()) {
-        // Try on DOM ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('📄 DOM ready, trying again...');
-            if (!trySimpleRender()) {
-                // Final attempt after delay
-                setTimeout(function() {
-                    console.log('🔄 Final attempt...');
-                    trySimpleRender();
-                }, 1000);
-            }
-        });
-    }
-@else
-    console.log('ℹ️ No seat layout data available');
-    document.addEventListener('DOMContentLoaded', function() {
-        const container = document.getElementById('seatLayoutDisplay');
-        if (container) {
-            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #6b7280;">No seat layout configured</div>';
-        }
-    });
-@endif
+        let html = `
+            <div class="seat-map-container">
+                <div class="bus-layout-container">
+                    <div class="bus-frame">
+                        <div class="bus-top-section">
+                            <div class="bus-door" title="Front Door">🚪</div>
+                            <div class="bus-front-space"></div>
+                            <div class="driver-seat" title="Driver">👨‍✈️</div>
+                        </div>
+                        <div class="main-seating-area">
+        `;
 
-// Backup execution for window load
-window.addEventListener('load', function() {
-    console.log('🌐 Window fully loaded - checking seat layout...');
-    const container = document.getElementById('seatLayoutDisplay');
-
-    if (container && container.innerHTML.includes('Loading seat layout')) {
-        console.log('🔄 Still loading, attempting final render...');
-        @if($bus->seat_layout)
-            const seatData = @json($bus->seat_layout);
-            renderBusLayout(seatData, 'seatLayoutDisplay');
-        @endif
-    }
-});
-
-// Simplified seat layout preview class for show page
-class SeatLayoutPreview {
-    constructor(layout, container) {
-        this.layout = layout;
-        this.container = container;
-    }
-
-    render() {
-        const { layout_type, rows, seats, driver_seat, door, has_back_row } = this.layout;
-
-        let html = '<div class="seat-map-container">';
-
-        // Bus layout container
-        html += '<div class="bus-layout-container">';
-        html += '<div class="bus-frame">';
-
-        // Top section with driver seat and door
-        html += '<div class="bus-top-section">';
-        html += '<div class="bus-door" title="Front Door">🚪</div>';
-        html += '<div class="bus-front-space"></div>';
-        html += '<div class="driver-seat" title="Driver">👨‍✈️</div>';
-        html += '</div>';
-
-        // Main seating area
-        html += this.renderMainSeatingArea();
-
-        html += '</div></div></div>';
-
-        this.container.innerHTML = html;
-    }
-
-    renderMainSeatingArea() {
-        const { rows, seats, has_back_row, aisle_position } = this.layout;
-
-        let html = '<div class="main-seating-area">';
-
-        // Group seats by row
         const seatsByRow = {};
-        seats.forEach(seat => {
-            if (!seatsByRow[seat.row]) {
-                seatsByRow[seat.row] = [];
-            }
-            seatsByRow[seat.row].push(seat);
-        });
+        if (seats) {
+            seats.forEach(seat => {
+                if (!seatsByRow[seat.row]) {
+                    seatsByRow[seat.row] = [];
+                }
+                seatsByRow[seat.row].push(seat);
+            });
+        }
 
-        // Render each row
-        for (let rowNum = 1; rowNum <= rows; rowNum++) {
-            const rowSeats = seatsByRow[rowNum] || [];
-            const isBackRow = has_back_row && rowNum === rows;
+        const maxRow = Object.keys(seatsByRow).length > 0 ? Math.max(...Object.keys(seatsByRow).map(r => parseInt(r, 10))) : 0;
 
-            html += `<div class="seat-row ${isBackRow ? 'back-row' : 'regular-row'}" data-row="${rowNum}">`;
+        for (let r = 1; r <= maxRow; r++) {
+            const rowSeats = seatsByRow[r] || [];
+            const isBackRow = has_back_row && r === maxRow;
+
+            html += `<div class="seat-row ${isBackRow ? 'back-row' : 'regular-row'}" data-row="${r}">`;
 
             if (isBackRow) {
-                html += this.renderBackRow(rowSeats);
+                html += '<div class="back-row-container">';
+                rowSeats.sort((a,b) => a.column - b.column).forEach(seat => {
+                    html += `<div class="seat available back-row-seat" title="Seat ${seat.number}">${seat.number}</div>`;
+                });
+                html += '</div>';
             } else {
-                html += this.renderRegularRow(rowSeats, aisle_position);
+                // Use the fixed column-based rendering
+                const seatsByColumn = {};
+                rowSeats.forEach(seat => {
+                    seatsByColumn[seat.column] = seat;
+                });
+
+                const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
+
+                for (let col = 1; col <= maxColumns; col++) {
+                    if (seatsByColumn[col]) {
+                        const seat = seatsByColumn[col];
+                        const isWindow = seat.is_window ? 'window-seat' : '';
+                        html += `<div class="seat available ${isWindow}" title="Seat ${seat.number}">${seat.number}</div>`;
+                    } else {
+                        html += '<div class="aisle-space"></div>';
+                    }
+                }
             }
 
-            html += '</div>';
+            html += `</div>`;
         }
 
-        html += '</div>';
-        return html;
+        html += `</div></div></div></div>`;
+        container.innerHTML = html;
+
+        console.log('✅ Seat layout rendered successfully');
     }
 
-    renderRegularRow(rowSeats, aislePosition) {
-        let html = '';
-
-        rowSeats.sort((a, b) => a.column - b.column);
-
-        let currentColumn = 1;
-
-        rowSeats.forEach(seat => {
-            if (currentColumn === aislePosition + 1) {
-                html += '<div class="aisle-space"></div>';
-            }
-
-            const isWindow = seat.is_window ? 'window-seat' : '';
-
-            html += `<div class="seat available ${isWindow}" title="Seat ${seat.number}">
-                        ${seat.number}
-                     </div>`;
-
-            currentColumn = seat.column + 1;
-        });
-
-        return html;
+    // Simple debug function for the reload button
+    function renderSimpleSeatLayout(seatData, containerId) {
+        console.log('🔄 Debug reload triggered');
+        renderSeatLayout(seatData, containerId);
     }
 
-    renderBackRow(rowSeats) {
-        let html = '<div class="back-row-container">';
+    // Function to regenerate seat layout
+    function regenerateSeatLayout(busId) {
+        console.log('🔧 Regenerating seat layout for bus:', busId);
 
-        rowSeats.sort((a, b) => a.column - b.column);
-
-        rowSeats.forEach(seat => {
-            html += `<div class="seat available back-row-seat" title="Seat ${seat.number}">
-                        ${seat.number}
-                     </div>`;
-        });
-
-        html += '</div>';
-        return html;
+        fetch(`/fix/bus-seat-layout/${busId}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Layout regenerated:', data);
+                if (data.success) {
+                    alert('Seat layout regenerated successfully! Refreshing page...');
+                    window.location.reload();
+                } else {
+                    alert('Failed to regenerate seat layout: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error regenerating layout:', error);
+                alert('Error regenerating seat layout. Check console for details.');
+            });
     }
-}
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 DOM loaded, initializing seat layout...');
+        @if($bus->seat_layout)
+            console.log('📋 Bus seat layout data:', @json($bus->seat_layout));
+            renderSeatLayout(@json($bus->seat_layout), 'seatLayoutDisplay');
+        @else
+            console.log('⚠️ No seat layout data available');
+        @endif
+    });
 </script>
 @endpush
 

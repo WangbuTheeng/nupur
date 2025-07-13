@@ -111,29 +111,37 @@ class RealtimeSeatMap {
         // Sort seats by column
         rowSeats.sort((a, b) => a.column - b.column);
 
-        let currentColumn = 1;
-
+        // Create a map of column positions to seats
+        const seatsByColumn = {};
         rowSeats.forEach(seat => {
-            // Add aisle space if needed
-            if (currentColumn === aislePosition + 1) {
+            seatsByColumn[seat.column] = seat;
+        });
+
+        // Get the maximum column number from the layout
+        const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
+
+        // Render each column position
+        for (let col = 1; col <= maxColumns; col++) {
+            if (seatsByColumn[col]) {
+                // Render seat
+                const seat = seatsByColumn[col];
+                const seatClass = this.getSeatClass(seat);
+                const seatType = seat.type || 'regular';
+                const isWindow = seat.is_window ? 'window-seat' : '';
+                const isAisle = seat.is_aisle ? 'aisle-seat' : '';
+
+                html += `<div class="seat ${seatClass} ${seatType} ${isWindow} ${isAisle}"
+                              data-seat="${seat.number}"
+                              data-row="${seat.row}"
+                              data-column="${seat.column}"
+                              title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''}${seat.is_aisle ? ' (Aisle)' : ''}">
+                            ${seat.number}
+                         </div>`;
+            } else {
+                // This is an aisle position - render aisle space
                 html += '<div class="aisle-space"></div>';
             }
-
-            const seatClass = this.getSeatClass(seat);
-            const seatType = seat.type || 'regular';
-            const isWindow = seat.is_window ? 'window-seat' : '';
-            const isAisle = seat.is_aisle ? 'aisle-seat' : '';
-
-            html += `<div class="seat ${seatClass} ${seatType} ${isWindow} ${isAisle}"
-                          data-seat="${seat.number}"
-                          data-row="${seat.row}"
-                          data-column="${seat.column}"
-                          title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''}${seat.is_aisle ? ' (Aisle)' : ''}">
-                        ${seat.number}
-                     </div>`;
-
-            currentColumn = seat.column + 1;
-        });
+        }
 
         return html;
     }

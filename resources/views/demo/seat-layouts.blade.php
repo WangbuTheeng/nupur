@@ -402,23 +402,33 @@
         renderRegularRow(rowSeats, aislePosition) {
             let html = '';
 
+            // Sort seats by column
             rowSeats.sort((a, b) => a.column - b.column);
 
-            let currentColumn = 1;
-
+            // Create a map of column positions to seats
+            const seatsByColumn = {};
             rowSeats.forEach(seat => {
-                if (currentColumn === aislePosition + 1) {
+                seatsByColumn[seat.column] = seat;
+            });
+
+            // Get the maximum column number from the layout
+            const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
+
+            // Render each column position
+            for (let col = 1; col <= maxColumns; col++) {
+                if (seatsByColumn[col]) {
+                    // Render seat
+                    const seat = seatsByColumn[col];
+                    const isWindow = seat.is_window ? 'window-seat' : '';
+
+                    html += `<div class="seat available ${isWindow}" title="Seat ${seat.number}">
+                                ${seat.number}
+                             </div>`;
+                } else {
+                    // This is an aisle position - render aisle space
                     html += '<div class="aisle-space"></div>';
                 }
-
-                const isWindow = seat.is_window ? 'window-seat' : '';
-
-                html += `<div class="seat available ${isWindow}" title="Seat ${seat.number}">
-                            ${seat.number}
-                         </div>`;
-
-                currentColumn = seat.column + 1;
-            });
+            }
 
             return html;
         }

@@ -106,13 +106,12 @@ class CounterController extends Controller
                 ->with('error', 'No routes available for the selected cities.');
         }
 
-        // Find available schedules for this operator
+        // Find available schedules for this operator (counter booking allowed until departure)
         $schedules = Auth::user()->schedules()
             ->with(['route.sourceCity', 'route.destinationCity', 'bus.busType'])
             ->whereIn('route_id', $routes)
             ->whereDate('travel_date', $request->travel_date)
-            ->where('status', 'scheduled')
-            ->where('available_seats', '>', 0)
+            ->bookableViaCounter() // Allow counter booking until departure time
             ->orderBy('departure_time')
             ->get();
 
@@ -141,12 +140,20 @@ class CounterController extends Controller
         $seatMap = $this->generateSeatMapWithBookings($schedule);
 
         // Debug: Log the seat map structure for troubleshooting
-        \Log::info('Seat map structure for schedule ' . $schedule->id, [
-            'has_layout' => isset($seatMap['layout']),
+        \Log::info('=== SEAT MAP DEBUG FOR SCHEDULE ' . $schedule->id . ' ===', [
+            'seatMap_keys' => array_keys($seatMap),
             'has_seats' => isset($seatMap['seats']),
-            'layout_keys' => isset($seatMap['layout']) ? array_keys($seatMap['layout']) : [],
             'seat_count' => isset($seatMap['seats']) ? count($seatMap['seats']) : 0,
+            'layout_type' => $seatMap['layout_type'] ?? 'N/A',
+            'rows' => $seatMap['rows'] ?? 'N/A',
+            'columns' => $seatMap['columns'] ?? 'N/A',
             'first_seat' => isset($seatMap['seats'][0]) ? $seatMap['seats'][0] : null,
+            'last_seat' => isset($seatMap['seats']) && count($seatMap['seats']) > 0 ? $seatMap['seats'][count($seatMap['seats']) - 1] : null,
+            'sample_seats' => isset($seatMap['seats']) ? array_slice($seatMap['seats'], 0, 5) : [],
+            'bus_id' => $schedule->bus->id,
+            'bus_total_seats' => $schedule->bus->total_seats,
+            'bus_seat_layout_exists' => isset($schedule->bus->seat_layout),
+            'bus_seat_layout_keys' => isset($schedule->bus->seat_layout) ? array_keys($schedule->bus->seat_layout) : [],
         ]);
 
         return view('operator.counter.book', compact('schedule', 'seatMap'));
@@ -162,33 +169,65 @@ class CounterController extends Controller
             abort(403, 'Unauthorized access to schedule.');
         }
 
-        // Log request data for debugging
-        \Log::info('Counter booking request received', [
+        // Check if schedule is still bookable via counter
+        if (!$schedule->isBookableViaCounter()) {
+            return back()->with('error', 'This schedule has already departed and is no longer available for booking.');
+        }
+
+        // Enhanced logging for debugging
+        \Log::info('=== Counter booking request received ===', [
             'request_data' => $request->all(),
             'schedule_id' => $schedule->id,
             'operator_id' => Auth::id(),
+            'request_method' => $request->method(),
+            'request_url' => $request->fullUrl(),
+            'user_agent' => $request->userAgent(),
         ]);
 
-        $request->validate([
-            'passenger_name' => 'required|string|max:255',
-            'passenger_phone' => 'required|string|max:20',
-            'passenger_email' => 'nullable|email|max:255',
-            'passenger_age' => 'required|integer|min:1|max:120',
-            'passenger_gender' => 'required|in:male,female,other',
-            'seat_numbers' => 'required|array|min:1',
-            'seat_numbers.*' => 'integer|min:1',
-            'contact_phone' => 'required|string|max:20',
-            'contact_email' => 'nullable|email|max:255',
-            'special_requests' => 'nullable|string|max:500',
-            'payment_method' => 'required|in:cash,card,digital',
-        ]);
+        // Check if seat_numbers is present and log it
+        if ($request->has('seat_numbers')) {
+            \Log::info('Seat numbers received:', [
+                'seat_numbers' => $request->seat_numbers,
+                'seat_numbers_type' => gettype($request->seat_numbers),
+                'seat_numbers_count' => is_array($request->seat_numbers) ? count($request->seat_numbers) : 0,
+            ]);
+        } else {
+            \Log::error('No seat_numbers in request!');
+        }
+
+        try {
+            $validatedData = $request->validate([
+                'passenger_name' => 'required|string|max:255',
+                'passenger_phone' => 'required|string|max:20',
+                'passenger_email' => 'nullable|email|max:255',
+                'passenger_age' => 'required|integer|min:1|max:120',
+                'passenger_gender' => 'required|in:male,female,other',
+                'seat_numbers' => 'required|array|min:1',
+                'seat_numbers.*' => 'required|string|max:10', // Changed from integer to string for seat numbers like "A1", "B2"
+                'contact_phone' => 'required|string|max:20',
+                'contact_email' => 'nullable|email|max:255',
+                'special_requests' => 'nullable|string|max:500',
+                'payment_method' => 'required|in:cash,card,digital',
+            ]);
+
+            \Log::info('Validation passed successfully', ['validated_data' => $validatedData]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed', [
+                'errors' => $e->errors(),
+                'request_data' => $request->all(),
+            ]);
+            throw $e;
+        }
 
         // Validate seat availability
-        $requestedSeats = $request->seat_numbers;
+        $requestedSeats = array_map('strval', $request->seat_numbers); // Ensure all seat numbers are strings
         $bookedSeats = $schedule->bookings()
             ->where('status', '!=', 'cancelled')
             ->pluck('seat_numbers')
             ->flatten()
+            ->map(function($seat) {
+                return is_string($seat) ? $seat : (string)$seat;
+            })
             ->toArray();
 
         $unavailableSeats = array_intersect($requestedSeats, $bookedSeats);
@@ -330,64 +369,94 @@ class CounterController extends Controller
      */
     private function generateSeatMapWithBookings(Schedule $schedule)
     {
-        $seatLayout = $schedule->bus->seat_layout;
+        // Get booked seats for this schedule
         $bookedSeats = $schedule->bookings()
             ->where('status', '!=', 'cancelled')
             ->pluck('seat_numbers')
             ->flatten()
+            ->map(function($seat) {
+                return is_string($seat) ? $seat : (string)$seat;
+            })
             ->toArray();
 
-        // If the seat layout doesn't have the expected structure, create a default one
-        if (!isset($seatLayout['seats']) || !isset($seatLayout['rows']) || !isset($seatLayout['columns'])) {
-            // Generate a default layout based on total seats
+        // Try to get existing seat layout from bus
+        $seatLayout = $schedule->bus->seat_layout;
+
+        // If no seat layout exists, generate one using the same service as bus creation
+        if (!isset($seatLayout['seats']) || empty($seatLayout['seats'])) {
+            \Log::info('=== GENERATING SEAT LAYOUT FOR SCHEDULE ' . $schedule->id . ' ===');
+            \Log::info('Bus details:', [
+                'bus_id' => $schedule->bus->id,
+                'total_seats' => $schedule->bus->total_seats,
+                'existing_layout' => $schedule->bus->seat_layout,
+            ]);
+
+            $seatLayoutService = new \App\Services\SeatLayoutService();
             $totalSeats = $schedule->bus->total_seats;
-            $columns = 4; // Default 4 columns
-            $rows = ceil($totalSeats / $columns);
+            $layoutType = '2x2'; // Default layout
+            $hasBackRow = $totalSeats > 25; // Add back row for larger buses
 
-            $seats = [];
-            for ($i = 1; $i <= $totalSeats; $i++) {
-                $seats[] = [
-                    'number' => $i,
-                    'type' => 'seat',
-                    'is_booked' => in_array($i, $bookedSeats),
-                    'is_available' => !in_array($i, $bookedSeats),
-                ];
-            }
+            // Generate layout using the same service as bus creation
+            $seatLayout = $seatLayoutService->generateSeatLayout($totalSeats, $layoutType, $hasBackRow);
 
-            return [
-                'layout' => [
-                    'rows' => $rows,
-                    'columns' => $columns,
-                    'aisle_position' => 2,
-                ],
-                'seats' => $seats,
-            ];
+            \Log::info('=== GENERATED LAYOUT RESULT ===', [
+                'total_seats' => $totalSeats,
+                'layout_type' => $layoutType,
+                'has_back_row' => $hasBackRow,
+                'generated_seats' => count($seatLayout['seats'] ?? []),
+                'layout_keys' => array_keys($seatLayout),
+                'first_generated_seat' => $seatLayout['seats'][0] ?? null,
+                'last_generated_seat' => isset($seatLayout['seats']) && count($seatLayout['seats']) > 0 ? $seatLayout['seats'][count($seatLayout['seats']) - 1] : null,
+            ]);
+        } else {
+            \Log::info('Using existing seat layout for schedule ' . $schedule->id, [
+                'existing_seat_count' => count($seatLayout['seats']),
+                'layout_keys' => array_keys($seatLayout),
+            ]);
         }
 
-        // Update booking status for each seat
-        foreach ($seatLayout['seats'] as &$seat) {
-            $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
-            if ($seatNumber) {
-                $seat['is_booked'] = in_array($seatNumber, $bookedSeats);
-                $seat['is_available'] = !$seat['is_booked'];
-                $seat['type'] = 'seat'; // Ensure type is set
-                $seat['number'] = $seatNumber; // Normalize the key
+        // Update booking status for each seat in existing layout
+        if (isset($seatLayout['seats'])) {
+            $columns = $seatLayout['columns'] ?? 4;
 
-                // Remove the old key if it exists
-                if (isset($seat['seat_number']) && $seat['seat_number'] !== $seat['number']) {
-                    unset($seat['seat_number']);
+            foreach ($seatLayout['seats'] as $index => &$seat) {
+                $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
+                if ($seatNumber) {
+                    $seatNumberStr = (string)$seatNumber;
+                    $seat['is_booked'] = in_array($seatNumberStr, $bookedSeats);
+                    $seat['is_available'] = !$seat['is_booked'];
+                    $seat['number'] = $seatNumberStr; // Normalize the key
+                    $seat['seat_number'] = $seatNumberStr; // Keep both for compatibility
+
+                    // Ensure row and column are set
+                    if (!isset($seat['row']) || !isset($seat['column'])) {
+                        // Calculate row and column based on index if missing
+                        $seat['row'] = floor($index / $columns) + 1;
+                        $seat['column'] = ($index % $columns) + 1;
+                    }
+
+                    // Ensure is_window is set
+                    if (!isset($seat['is_window'])) {
+                        $seat['is_window'] = ($seat['column'] === 1 || $seat['column'] === $columns);
+                    }
                 }
             }
+
+            \Log::info('Updated existing seat layout for schedule ' . $schedule->id, [
+                'seat_count' => count($seatLayout['seats']),
+                'booked_seats' => count($bookedSeats),
+                'first_seat' => $seatLayout['seats'][0] ?? null
+            ]);
         }
 
-        // Return the structure expected by the view
-        return [
-            'layout' => [
-                'rows' => $seatLayout['rows'] ?? ceil($schedule->bus->total_seats / 4),
-                'columns' => $seatLayout['columns'] ?? 4,
-                'aisle_position' => $seatLayout['aisle_position'] ?? 2,
-            ],
-            'seats' => $seatLayout['seats'],
-        ];
+        // Ensure all required fields are present
+        $seatLayout['layout_type'] = $seatLayout['layout_type'] ?? '2x2';
+        $seatLayout['rows'] = $seatLayout['rows'] ?? ceil(count($seatLayout['seats'] ?? []) / 4);
+        $seatLayout['columns'] = $seatLayout['columns'] ?? 4;
+        $seatLayout['aisle_position'] = $seatLayout['aisle_position'] ?? 2;
+        $seatLayout['has_back_row'] = $seatLayout['has_back_row'] ?? false;
+
+        // Return the exact same structure as bus details page
+        return $seatLayout;
     }
 }

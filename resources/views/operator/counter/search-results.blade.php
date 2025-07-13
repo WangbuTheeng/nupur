@@ -108,17 +108,30 @@
 
                             <!-- Action Button -->
                             <div class="text-center">
-                                @if($schedule->available_seats > 0)
-                                    <a href="{{ route('operator.counter.book', $schedule) }}" 
-                                       class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
-                                        <i class="fas fa-ticket-alt mr-2"></i>
-                                        Book Now
-                                    </a>
-                                @else
+                                @if($schedule->hasFinished())
+                                    <button disabled class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-red-400 bg-red-50 cursor-not-allowed">
+                                        <i class="fas fa-times mr-2"></i>
+                                        Departed
+                                    </button>
+                                    <div class="text-xs text-red-600 mt-1">
+                                        This bus has already departed
+                                    </div>
+                                @elseif($schedule->available_seats <= 0)
                                     <button disabled class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed">
                                         <i class="fas fa-times mr-2"></i>
                                         Fully Booked
                                     </button>
+                                @else
+                                    <a href="{{ route('operator.counter.book', $schedule) }}"
+                                       class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+                                        <i class="fas fa-ticket-alt mr-2"></i>
+                                        Book Now
+                                    </a>
+                                    @if($schedule->minutes_until_departure <= 30)
+                                        <div class="text-xs text-orange-600 mt-1">
+                                            ⚠️ Departing in {{ $schedule->minutes_until_departure }} minutes
+                                        </div>
+                                    @endif
                                 @endif
                                 
                                 <div class="mt-2">
