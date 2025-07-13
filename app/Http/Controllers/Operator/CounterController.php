@@ -393,8 +393,17 @@ class CounterController extends Controller
 
             $seatLayoutService = new \App\Services\SeatLayoutService();
             $totalSeats = $schedule->bus->total_seats;
-            $layoutType = '2x2'; // Default layout
-            $hasBackRow = $totalSeats > 25; // Add back row for larger buses
+
+            // Determine layout type based on total seats (same logic as bus creation)
+            $layoutType = '2x2'; // Default
+            if ($totalSeats <= 20) {
+                $layoutType = '2x1';
+            } elseif ($totalSeats >= 35) {
+                $layoutType = '3x2';
+            }
+
+            // Always use back row for consistency
+            $hasBackRow = true;
 
             // Generate layout using the same service as bus creation
             $seatLayout = $seatLayoutService->generateSeatLayout($totalSeats, $layoutType, $hasBackRow);

@@ -102,127 +102,21 @@
                         @endif
 
                         <div id="counterSeatLayoutDisplay" class="min-h-[400px]">
-                            <!-- Direct PHP-rendered bus layout - No JavaScript dependency -->
-                            <div class="php-seat-layout">
-                                <!-- Bus Frame -->
-                                <div style="max-width: 500px; margin: 0 auto; padding: 20px; background: #f8fafc; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="background: linear-gradient(to bottom, #f8fafc, #e2e8f0); border: 3px solid #475569; border-radius: 25px; padding: 15px;">
-
-                                        <!-- Top section with door and driver -->
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 8px 15px; background: rgba(255,255,255,0.7); border-radius: 15px; border: 2px solid #cbd5e1;">
-                                            <div style="background: #3b82f6; color: white; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;">🚪 Door</div>
-                                            <div style="background: #10b981; color: white; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;">👨‍✈️ Driver</div>
+                            <!-- Bus Frame Layout matching operator bus design -->
+                            <div class="seat-map-container">
+                                <div class="bus-layout-container">
+                                    <div class="bus-frame">
+                                        <div class="bus-top-section">
+                                            <div class="bus-door" title="Front Door">🚪</div>
+                                            <div class="bus-front-space"></div>
+                                            <div class="driver-seat" title="Driver">👨‍✈️</div>
                                         </div>
+                                        <div class="main-seating-area">
 
-                                        <!-- Seating area -->
-                                        <div style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
-                                            @if(isset($seatMap['seats']) && is_array($seatMap['seats']))
-                                                @php
-                                                    $seats = $seatMap['seats'];
-                                                    $rows = $seatMap['rows'] ?? 8;
-                                                    $columns = $seatMap['columns'] ?? 4;
-                                                    $aislePosition = $seatMap['aisle_position'] ?? 2;
-
-                                                    // Group seats by row
-                                                    $seatsByRow = [];
-                                                    foreach ($seats as $seat) {
-                                                        $row = $seat['row'] ?? 1;
-                                                        if (!isset($seatsByRow[$row])) {
-                                                            $seatsByRow[$row] = [];
-                                                        }
-                                                        $seatsByRow[$row][] = $seat;
-                                                    }
-
-                                                    // Sort seats within each row by column
-                                                    foreach ($seatsByRow as &$rowSeats) {
-                                                        usort($rowSeats, function($a, $b) {
-                                                            return ($a['column'] ?? 1) - ($b['column'] ?? 1);
-                                                        });
-                                                    }
-                                                @endphp
-
-                                                @for($row = 1; $row <= $rows; $row++)
-                                                    @if(isset($seatsByRow[$row]) && count($seatsByRow[$row]) > 0)
-                                                        @php
-                                                            $rowSeats = $seatsByRow[$row];
-                                                            $isBackRow = ($seatMap['has_back_row'] ?? false) && $row == $rows;
-                                                        @endphp
-
-                                                        @if($isBackRow)
-                                                            {{-- Back Row - Continuous full-width seats --}}
-                                                            <div style="display: flex; gap: 4px; justify-content: center; align-items: center; background: rgba(255,255,255,0.3); padding: 4px 8px; border-radius: 8px;">
-                                                                @foreach($rowSeats as $seat)
-                                                                    @php
-                                                                        $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? 'N/A';
-                                                                        $isBooked = $seat['is_booked'] ?? false;
-                                                                        $isWindow = $seat['is_window'] ?? false;
-                                                                    @endphp
-
-                                                                    <button type="button"
-                                                                            class="seat-button back-row-seat {{ $isBooked ? 'booked' : 'available' }} {{ $isWindow ? 'window-seat' : '' }}"
-                                                                            data-seat="{{ $seatNumber }}"
-                                                                            data-booked="{{ $isBooked ? 'true' : 'false' }}"
-                                                                            data-window="{{ $isWindow ? 'true' : 'false' }}"
-                                                                            @if($isBooked) disabled @endif
-                                                                            onclick="toggleSeatSelection(this, '{{ $seatNumber }}')"
-                                                                            title="Seat {{ $seatNumber }}{{ $isWindow ? ' (Window)' : '' }} - Back Row"
-                                                                            style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease; border: 2px solid #374151; position: relative; z-index: 1; background: {{ $isBooked ? '#ef4444' : '#22c55e' }}; color: white; text-decoration: none; outline: none; margin: 2px;">
-                                                                        {{ $seatNumber }}
-                                                                    </button>
-                                                                @endforeach
-                                                            </div>
-                                                        @else
-                                                            {{-- Regular Row - With aisle spacing --}}
-                                                            <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
-                                                                @php
-                                                                    // Sort seats by column for proper left-to-right order
-                                                                    usort($rowSeats, function($a, $b) {
-                                                                        return ($a['column'] ?? 1) - ($b['column'] ?? 1);
-                                                                    });
-                                                                @endphp
-
-                                                                @foreach($rowSeats as $seat)
-                                                                    @php
-                                                                        $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? 'N/A';
-                                                                        $isBooked = $seat['is_booked'] ?? false;
-                                                                        $isWindow = $seat['is_window'] ?? false;
-                                                                        $column = $seat['column'] ?? 1;
-                                                                    @endphp
-
-                                                                    {{-- Add aisle space after position 2 for 2x2 layout --}}
-                                                                    @if($column == $aislePosition + 1)
-                                                                        <div style="width: 20px; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px;">|</div>
-                                                                    @endif
-
-                                                                    <button type="button"
-                                                                            class="seat-button regular-seat {{ $isBooked ? 'booked' : 'available' }} {{ $isWindow ? 'window-seat' : '' }}"
-                                                                            data-seat="{{ $seatNumber }}"
-                                                                            data-booked="{{ $isBooked ? 'true' : 'false' }}"
-                                                                            data-window="{{ $isWindow ? 'true' : 'false' }}"
-                                                                            @if($isBooked) disabled @endif
-                                                                            onclick="toggleSeatSelection(this, '{{ $seatNumber }}')"
-                                                                            title="Seat {{ $seatNumber }}{{ $isWindow ? ' (Window)' : '' }}"
-                                                                            style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease; border: 2px solid #374151; position: relative; z-index: 1; background: {{ $isBooked ? '#ef4444' : '#22c55e' }}; color: white; text-decoration: none; outline: none; margin: 2px;">
-                                                                        {{ $seatNumber }}
-                                                                    </button>
-                                                                @endforeach
-                                                            </div>
-                                                        @endif
-                                                    @endif
-                                                @endfor
-                                            @else
-                                                <div style="text-align: center; padding: 2rem; color: #ef4444;">
-                                                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                                                    <p>No seat data available</p>
-                                                </div>
-                                            @endif
+                                            <!-- Seats will be rendered by JavaScript -->
                                         </div>
-
-                                        <!-- Layout info -->
-                                        <div style="text-align: center; margin-top: 15px; padding: 8px; background: rgba(255,255,255,0.8); border-radius: 8px; font-size: 12px; color: #6b7280;">
-                                            <strong>{{ strtoupper($seatMap['layout_type'] ?? '2X2') }}</strong> Layout •
-                                            <strong>{{ count($seatMap['seats'] ?? []) }}</strong> Seats •
-                                            {{ ($seatMap['has_back_row'] ?? false) ? 'With' : 'Without' }} Back Row
+                                        <div class="back-row-label" style="text-align: center; margin-top: 10px; font-size: 12px; color: #6b7280; border-top: 1px solid #d1d5db; padding-top: 8px;">
+                                            BACK ROW
                                         </div>
                                     </div>
                                 </div>
@@ -391,75 +285,105 @@
 
 @push('styles')
 <style>
+/* Bus Frame Layout Styles - matching operator bus design */
+.bus-frame {
+    background: #f0f4f8;
+    border: 2px solid #a0aec0;
+    border-radius: 20px;
+    padding: 20px;
+    max-width: 400px;
+    margin: auto;
+}
+
+.bus-top-section {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.bus-door, .driver-seat {
+    padding: 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    color: white;
+}
+
+.bus-door {
+    background-color: #4299e1;
+}
+
+.driver-seat {
+    background-color: #48bb78;
+}
+
+.main-seating-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.seat-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.aisle-space {
+    width: 20px;
+}
+
 /* Force seat button styles to override any conflicts */
 .seat-button, button.seat-button {
-    width: 36px !important;
-    height: 36px !important;
-    border-radius: 8px !important;
+    width: 50px !important;
+    height: 40px !important;
+    border-radius: 5px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    font-weight: bold !important;
+    font-size: 12px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    border: 2px solid #374151 !important;
-    position: relative !important;
-    z-index: 1 !important;
-    color: white !important;
-    text-decoration: none !important;
-    outline: none !important;
-    margin: 2px !important;
-    background: #22c55e !important; /* Default green */
-}
-
-.seat-button.back-row-seat {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 10px !important;
-}
-/* Counter booking seat styles - ensuring proper selection colors */
-.seat-button {
-    width: 36px !important;
-    height: 36px !important;
-    border-radius: 8px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    border: 2px solid #374151 !important;
-    position: relative !important;
-    z-index: 1 !important;
-    background: #22c55e !important; /* Default green for available */
+    border: none !important;
     color: white !important;
     text-decoration: none !important;
     outline: none !important;
     margin: 2px !important;
 }
 
-/* Back row seats are smaller */
-.seat-button.back-row-seat {
-    width: 32px;
-    height: 32px;
-    font-size: 10px !important;
+/* Seat state styling - matching operator bus design */
+.seat.available {
+    background-color: #68d391;
+}
+
+.seat.window-seat {
+    background-color: #63b3ed;
+}
+
+.seat.back-row-seat {
+    background-color: #a78bfa;
 }
 
 /* Available seat styling - Green color */
 .seat-button.available {
-    background: #22c55e !important; /* Green for available */
+    background: #68d391 !important; /* Green for available */
     color: white !important;
-    border-color: #16a34a !important;
 }
 
 .seat-button.available:hover {
-    background: #16a34a !important;
+    background: #48bb78 !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Window seat styling */
+.seat-button.window-seat:not(.selected):not(.booked):not(.reserved) {
+    background: #63b3ed !important;
+}
+
+/* Back row seat styling */
+.seat-button.back-row-seat:not(.selected):not(.booked):not(.reserved) {
+    background: #a78bfa !important;
 }
 
 /* Selected/Reserved seat styling - Blue color - HIGHEST PRIORITY */
@@ -531,6 +455,109 @@ button.seat-button.selected {
 // Simple, guaranteed-to-work seat selection system
 let selectedSeats = [];
 const farePerSeat = {{ $schedule->fare }};
+
+// Render seat layout in bus frame - matching operator bus design
+function renderCounterSeatLayout(seatData, containerId) {
+    console.log('🚌 Rendering counter seat layout for:', containerId);
+    console.log('📊 Seat data:', seatData);
+
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error('❌ Container not found:', containerId);
+        return;
+    }
+
+    const { seats, has_back_row, layout_type, aisle_position } = seatData;
+
+    // Find the main seating area within the bus frame
+    const mainSeatingArea = container.querySelector('.main-seating-area');
+    if (!mainSeatingArea) {
+        console.error('❌ Main seating area not found');
+        return;
+    }
+
+    let html = '';
+
+    const seatsByRow = {};
+    if (seats) {
+        seats.forEach(seat => {
+            if (!seatsByRow[seat.row]) {
+                seatsByRow[seat.row] = [];
+            }
+            seatsByRow[seat.row].push(seat);
+        });
+    }
+
+    const maxRow = Object.keys(seatsByRow).length > 0 ? Math.max(...Object.keys(seatsByRow).map(r => parseInt(r, 10))) : 0;
+
+    for (let r = 1; r <= maxRow; r++) {
+        const rowSeats = seatsByRow[r] || [];
+        const isBackRow = has_back_row && r === maxRow;
+
+        html += `<div class="seat-row ${isBackRow ? 'back-row' : 'regular-row'}" data-row="${r}">`;
+
+        if (isBackRow) {
+            html += '<div class="back-row-container" style="display: flex; gap: 5px; justify-content: center;">';
+            rowSeats.sort((a,b) => a.column - b.column).forEach(seat => {
+                const seatClasses = `seat-button available back-row-seat ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
+                const isBooked = seat.is_booked || false;
+                html += `<button type="button"
+                    class="${seatClasses}"
+                    data-seat="${seat.number}"
+                    data-booked="${isBooked}"
+                    data-window="${seat.is_window || false}"
+                    ${isBooked ? 'disabled' : ''}
+                    onclick="toggleSeatSelection(this, '${seat.number}')"
+                    title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''} - Back Row"
+                    style="width: 35px; height: 35px;">${seat.number}</button>`;
+            });
+            html += '</div>';
+        } else {
+            // Use the fixed column-based rendering
+            const seatsByColumn = {};
+            rowSeats.forEach(seat => {
+                seatsByColumn[seat.column] = seat;
+            });
+
+            const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
+
+            for (let col = 1; col <= maxColumns; col++) {
+                if (seatsByColumn[col]) {
+                    const seat = seatsByColumn[col];
+                    const seatClasses = `seat-button available ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
+                    const isBooked = seat.is_booked || false;
+                    html += `<button type="button"
+                        class="${seatClasses}"
+                        data-seat="${seat.number}"
+                        data-booked="${isBooked}"
+                        data-window="${seat.is_window || false}"
+                        ${isBooked ? 'disabled' : ''}
+                        onclick="toggleSeatSelection(this, '${seat.number}')"
+                        title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''}">${seat.number}</button>`;
+                } else {
+                    html += '<div class="aisle-space"></div>';
+                }
+            }
+        }
+
+        html += `</div>`;
+    }
+
+    mainSeatingArea.innerHTML = html;
+    console.log('✅ Counter seat layout rendered successfully');
+}
+
+// Force render layout function for debug button
+function forceRenderLayout() {
+    console.log('🔄 Force rendering layout...');
+    const seatData = @json($seatMap);
+    renderCounterSeatLayout(seatData, 'counterSeatLayoutDisplay');
+
+    // Re-initialize seat colors after rendering
+    setTimeout(() => {
+        initializeSeatColors();
+    }, 100);
+}
 
 // Debug function to check seat rendering
 function debugSeatRendering() {
@@ -635,7 +662,17 @@ function toggleSeatSelection(button, seatNumber) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Counter booking setup complete - using PHP-rendered layout');
+    console.log('🚀 Counter booking setup complete - rendering bus layout');
+
+    // Render the seat layout using JavaScript
+    const seatData = @json($seatMap);
+    console.log('📊 Seat map data:', seatData);
+
+    if (seatData && seatData.seats) {
+        renderCounterSeatLayout(seatData, 'counterSeatLayoutDisplay');
+    } else {
+        console.error('❌ No seat data available');
+    }
 
     // Debug: Check authentication and CSRF
     const csrfToken = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');

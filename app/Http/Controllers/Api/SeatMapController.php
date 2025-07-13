@@ -143,15 +143,23 @@ class SeatMapController extends Controller
     {
         $reservedSeats = [];
 
-        // In a real application, you might want to use Redis for better pattern matching
-        // For now, we'll use a simple approach
-        $cacheKeys = Cache::getStore()->getRedis()->keys('seat_reservation_' . $scheduleId . '_*');
+        // For database cache, we'll use a different approach
+        // Get all cache entries for this schedule from the database
+        try {
+            $cacheEntries = \DB::table('cache')
+                ->where('key', 'like', 'laravel_cache:seat_reservation_' . $scheduleId . '_%')
+                ->get();
 
-        foreach ($cacheKeys as $key) {
-            $reservation = Cache::get($key);
-            if ($reservation && isset($reservation['seat_numbers'])) {
-                $reservedSeats = array_merge($reservedSeats, $reservation['seat_numbers']);
+            foreach ($cacheEntries as $entry) {
+                $data = unserialize($entry->value);
+                if (isset($data['seat_numbers']) && is_array($data['seat_numbers'])) {
+                    $reservedSeats = array_merge($reservedSeats, $data['seat_numbers']);
+                }
             }
+        } catch (\Exception $e) {
+            // If there's an error with cache lookup, just return empty array
+            // This ensures the seat map still works even if cache is unavailable
+            \Log::warning('Failed to get reserved seats from cache: ' . $e->getMessage());
         }
 
         return array_unique($reservedSeats);

@@ -16,7 +16,7 @@ class SeatLayoutService
             'right_seats' => 2,
             'total_per_row' => 4,
             'aisle_position' => 3, // Between columns 2 and 4
-            'back_row_seats' => 5,
+            'back_row_seats' => 5, // Always 5 seats in back row
             'back_row_config' => ['left' => 2, 'right' => 3],
         ],
         self::LAYOUT_2X1 => [
@@ -24,7 +24,7 @@ class SeatLayoutService
             'right_seats' => 1,
             'total_per_row' => 3,
             'aisle_position' => 3, // Between columns 2 and 4
-            'back_row_seats' => 4,
+            'back_row_seats' => 4, // Always 4 seats in back row
             'back_row_config' => ['left' => 2, 'right' => 2],
         ],
         self::LAYOUT_3X2 => [
@@ -32,8 +32,8 @@ class SeatLayoutService
             'right_seats' => 2,
             'total_per_row' => 5,
             'aisle_position' => 4, // Between columns 3 and 5
-            'back_row_seats' => 6,
-            'back_row_config' => ['left' => 3, 'right' => 3],
+            'back_row_seats' => 5, // Always 5 seats in back row (not 6)
+            'back_row_config' => ['left' => 2, 'right' => 3],
         ],
     ];
 
@@ -49,18 +49,10 @@ class SeatLayoutService
         $seatsPerRow = $config['total_per_row'];
 
         if ($hasBackRow) {
-            // Calculate optimal distribution
-            $maxBackRowSeats = $config['back_row_seats'];
-            $regularRows = floor(($totalSeats - 1) / $seatsPerRow); // At least 1 seat for back row
-            $regularSeats = $regularRows * $seatsPerRow;
-            $backRowSeats = min($totalSeats - $regularSeats, $maxBackRowSeats);
-
-            // If back row would be too small, redistribute
-            if ($backRowSeats < 3) {
-                $regularRows = floor($totalSeats / $seatsPerRow);
-                $regularSeats = $regularRows * $seatsPerRow;
-                $backRowSeats = $totalSeats - $regularSeats;
-            }
+            // Use fixed back row seat count based on layout type
+            $backRowSeats = $config['back_row_seats'];
+            $regularSeats = $totalSeats - $backRowSeats;
+            $regularRows = ceil($regularSeats / $seatsPerRow);
         } else {
             $backRowSeats = 0;
             $regularSeats = $totalSeats;
@@ -137,41 +129,21 @@ class SeatLayoutService
             }
         }
 
-        // Generate back row seats if enabled
+        // Generate back row seats if enabled (continuous across full width)
         if ($hasBackRow && $backRowSeats > 0) {
             $backRowNumber = $regularRows + 1;
-            $backRowConfig = $config['back_row_config'];
-            $leftSeats = min($backRowSeats, $backRowConfig['left']);
-            $rightSeats = $backRowSeats - $leftSeats;
 
-            // Generate left side back row seats
-            for ($col = 1; $col <= $leftSeats; $col++) {
+            // Generate back row seats continuously across the available width
+            for ($col = 1; $col <= $backRowSeats; $col++) {
                 $layout['seats'][] = [
                     'number' => $seatNumber,
                     'row' => $backRowNumber,
                     'column' => $col,
                     'type' => 'back_row',
-                    'is_window' => ($col == 1),
-                    'is_aisle' => ($col == $leftSeats),
+                    'is_window' => ($col == 1 || $col == $backRowSeats),
+                    'is_aisle' => false,
                     'is_available' => true,
-                    'side' => 'back_left'
-                ];
-                $seatNumber++;
-            }
-
-            // Generate right side back row seats
-            for ($col = 1; $col <= $rightSeats; $col++) {
-                $actualColumn = $config['left_seats'] + 1 + $col; // Skip aisle position
-
-                $layout['seats'][] = [
-                    'number' => $seatNumber,
-                    'row' => $backRowNumber,
-                    'column' => $actualColumn,
-                    'type' => 'back_row',
-                    'is_window' => ($col == $rightSeats),
-                    'is_aisle' => ($col == 1),
-                    'is_available' => true,
-                    'side' => 'back_right'
+                    'side' => 'back'
                 ];
                 $seatNumber++;
             }
