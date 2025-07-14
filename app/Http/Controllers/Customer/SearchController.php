@@ -19,7 +19,15 @@ class SearchController extends Controller
      */
     public function index()
     {
-        $cities = City::orderBy('name')->get();
+        // Get only active cities that have routes (either as source or destination)
+        // and deduplicate by name to avoid showing duplicate city names
+        $cities = City::active()
+            ->withActiveRoutes()
+            ->orderBy('name')
+            ->get()
+            ->unique('name') // Remove duplicates by name
+            ->values(); // Reset array keys
+
         $popularRoutes = Route::withCount(['schedules as booking_count' => function($query) {
                 $query->join('bookings', 'schedules.id', '=', 'bookings.schedule_id')
                       ->where('bookings.status', 'confirmed');

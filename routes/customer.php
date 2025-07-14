@@ -49,7 +49,7 @@ Route::middleware(['auth', 'user'])->group(function () {
     });
 
     // Customer Payments
-    Route::prefix('customer/payments')->name('payments.')->group(function () {
+    Route::prefix('customer/payments')->name('customer.payments.')->group(function () {
         Route::get('/history', [PaymentController::class, 'history'])->name('history');
     });
     
@@ -94,6 +94,7 @@ Route::middleware(['auth', 'user'])->group(function () {
     // E-Tickets
     Route::prefix('tickets')->name('tickets.')->group(function () {
         Route::get('/{booking}', [TicketController::class, 'show'])->name('show');
+        Route::get('/{booking}/view', [TicketController::class, 'view'])->name('view');
         Route::get('/{booking}/download', [TicketController::class, 'download'])->name('download');
         Route::get('/{booking}/email', [TicketController::class, 'email'])->name('email');
         Route::post('/{booking}/email', [TicketController::class, 'sendEmail'])->name('send-email');
@@ -101,7 +102,7 @@ Route::middleware(['auth', 'user'])->group(function () {
     });
     
     // Customer Profile
-    Route::prefix('profile')->name('profile.')->group(function () {
+    Route::prefix('profile')->name('customer.profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         Route::get('/edit', [ProfileController::class, 'edit'])->name('edit');
         Route::put('/', [ProfileController::class, 'update'])->name('update');

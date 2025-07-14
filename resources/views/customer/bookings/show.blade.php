@@ -78,7 +78,7 @@
                                     </svg>
                                     <h4 class="font-semibold text-gray-900">Departure Time</h4>
                                 </div>
-                                <p class="text-lg font-bold text-gray-900">{{ $booking->schedule->departure_time->format('h:i A') }}</p>
+                                <p class="text-lg font-bold text-gray-900">{{ \Carbon\Carbon::parse($booking->schedule->departure_time)->format('h:i A') }}</p>
                             </div>
 
                             <div class="p-6 bg-gray-50 rounded-xl">

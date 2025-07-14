@@ -118,14 +118,15 @@
                 </div>
             </div>
 
-            <!-- QR Code Section -->
+            <!-- Verification Section -->
             <div class="text-center bg-gray-50 rounded-lg p-6 mb-8">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Verification QR Code</h4>
+                <h4 class="text-lg font-semibold text-gray-900 mb-4">Ticket Verification</h4>
                 <div class="inline-block p-4 bg-white rounded-lg shadow-md">
-                    <img src="{{ $qrCodeDataUri }}" alt="QR Code" class="w-48 h-48 mx-auto">
+                    <div class="text-2xl font-bold text-gray-900 mb-2">{{ $booking->booking_reference }}</div>
+                    <div class="text-sm text-gray-600">Booking Reference</div>
                 </div>
                 <p class="text-gray-600 text-sm mt-4">
-                    Show this QR code to the bus conductor for verification
+                    Show this booking reference to the bus conductor for verification
                 </p>
             </div>
 

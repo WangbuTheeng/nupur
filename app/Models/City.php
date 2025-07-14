@@ -65,4 +65,18 @@ class City extends Model
     {
         return $query->where('province', $province);
     }
+
+    /**
+     * Scope to get cities that have active routes.
+     */
+    public function scopeWithActiveRoutes($query)
+    {
+        return $query->where(function($query) {
+            $query->whereHas('sourceRoutes', function($routeQuery) {
+                $routeQuery->where('is_active', true);
+            })->orWhereHas('destinationRoutes', function($routeQuery) {
+                $routeQuery->where('is_active', true);
+            });
+        });
+    }
 }

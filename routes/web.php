@@ -29,6 +29,8 @@ Route::get('/test/navbar', function () {
     return view('test-navbar');
 })->name('test.navbar');
 
+
+
 // Debug route to check bus data
 Route::get('/debug/bus-data', function () {
     $bus = App\Models\Bus::first();
@@ -252,18 +254,26 @@ Route::get('/dashboard', function () {
     }
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+// eSewa Payment Callback Routes (must be outside auth middleware)
+Route::get('/payment/esewa/success', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
+Route::get('/payment/esewa/failure', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Payment Routes
+    // Payment Routes (require authentication)
     Route::get('/payment/{booking}/options', [App\Http\Controllers\PaymentController::class, 'showPaymentOptions'])->name('payment.options');
     Route::post('/payment/{booking}/esewa', [App\Http\Controllers\PaymentController::class, 'initiateEsewaPayment'])->name('payment.esewa.initiate');
-    Route::get('/payment/esewa/success', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
-    Route::get('/payment/esewa/failure', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
     Route::get('/payment/{payment}/status', [App\Http\Controllers\PaymentController::class, 'getPaymentStatus'])->name('payment.status');
+    Route::get('/payment/{payment}/esewa/check-status', [App\Http\Controllers\PaymentController::class, 'checkEsewaStatus'])->name('payment.esewa.check-status');
     Route::get('/payments/history', [App\Http\Controllers\PaymentController::class, 'paymentHistory'])->name('payments.history');
+
+    // Public Ticket Verification Routes (accessible without authentication)
+    Route::get('/verify-ticket', [App\Http\Controllers\TicketController::class, 'showVerifyForm'])->name('tickets.verify.form');
+    Route::post('/verify-ticket', [App\Http\Controllers\TicketController::class, 'verify'])->name('tickets.verify');
+    Route::post('/verify-ticket/manual', [App\Http\Controllers\TicketController::class, 'verifyManual'])->name('tickets.verify.manual');
 });
 
 require __DIR__.'/auth.php';

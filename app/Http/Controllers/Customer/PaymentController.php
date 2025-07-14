@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Services\EsewaPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,12 @@ use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
+    protected $esewaService;
+
+    public function __construct(EsewaPaymentService $esewaService)
+    {
+        $this->esewaService = $esewaService;
+    }
     /**
      * Show payment options for booking.
      */
@@ -106,28 +113,37 @@ class PaymentController extends Controller
     }
 
     /**
-     * Process eSewa payment.
+     * Process eSewa payment using actual eSewa v2 API.
      */
     private function processEsewaPayment(Booking $booking)
     {
-        // For demo purposes, we'll simulate the eSewa payment process
-        // In production, you would integrate with actual eSewa API
+        try {
+            // Update booking with payment method
+            $booking->update([
+                'payment_method' => 'esewa',
+            ]);
 
-        $esewaConfig = [
-            'merchant_code' => config('payment.esewa.merchant_code', 'EPAYTEST'),
-            'success_url' => route('payment.success', $booking),
-            'failure_url' => route('payment.failed', $booking),
-        ];
+            // Initiate payment with eSewa
+            $result = $this->esewaService->initiatePayment($booking);
 
-        // Update booking with payment method
-        $booking->update([
-            'payment_method' => 'esewa',
-            'payment_gateway_reference' => 'ESW-' . time() . '-' . $booking->id,
-        ]);
+            if ($result['success']) {
+                return view('customer.payment.esewa-redirect', [
+                    'booking' => $booking,
+                    'payment' => $result['payment'],
+                    'form_html' => $result['form_html']
+                ]);
+            } else {
+                return back()->with('error', $result['message']);
+            }
 
-        // For demo, redirect directly to success
-        // In production, redirect to eSewa payment gateway
-        return $this->simulatePaymentSuccess($booking, 'esewa');
+        } catch (\Exception $e) {
+            Log::error('eSewa payment processing error', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', 'Payment processing failed. Please try again.');
+        }
     }
 
     /**

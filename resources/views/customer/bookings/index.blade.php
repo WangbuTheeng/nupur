@@ -111,7 +111,7 @@
                                             </svg>
                                             <div>
                                                 <p class="text-xs text-gray-500 font-medium">Departure</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ $booking->schedule->departure_time->format('h:i A') }}</p>
+                                                <p class="text-sm font-semibold text-gray-900">{{ \Carbon\Carbon::parse($booking->schedule->departure_time)->format('h:i A') }}</p>
                                             </div>
                                         </div>
                                         <div class="flex items-center">

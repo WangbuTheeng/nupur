@@ -34,7 +34,7 @@
                         </svg>
                         Email Ticket
                     </a>
-                    <button onclick="window.print()" 
+                    <button onclick="printCompactTicket()"
                             class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
@@ -115,26 +115,46 @@
                     <!-- Passenger Information -->
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">Passenger Details</h3>
+
+                        <!-- Debug Info (remove in production) -->
+                        <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                            <strong>Debug:</strong>
+                            Passenger Count: {{ $booking->passenger_count }} |
+                            Seat Count: {{ count($booking->seat_numbers) }} |
+                            Details Count: {{ count($booking->passenger_details) }}
+                        </div>
+
                         <div class="space-y-3">
-                            @foreach($booking->passenger_details as $index => $passenger)
-                                <div class="bg-gray-50 rounded-lg p-4">
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <div class="font-semibold text-gray-900">{{ $passenger['name'] }}</div>
-                                            <div class="text-sm text-gray-600">
-                                                Age: {{ $passenger['age'] }} | Gender: {{ ucfirst($passenger['gender']) }}
-                                                @if(isset($passenger['phone']) && $passenger['phone'])
-                                                    | Phone: {{ $passenger['phone'] }}
-                                                @endif
+                            @if($booking->passenger_details && count($booking->passenger_details) > 0)
+                                @foreach($booking->seat_numbers as $index => $seatNumber)
+                                    @php
+                                        $passenger = $booking->passenger_details[$index] ?? $booking->passenger_details[0] ?? null;
+                                    @endphp
+                                    @if($passenger)
+                                        <div class="bg-gray-50 rounded-lg p-4">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-semibold text-gray-900">{{ $passenger['name'] }}</div>
+                                                    <div class="text-sm text-gray-600">
+                                                        Age: {{ $passenger['age'] }} | Gender: {{ ucfirst($passenger['gender']) }}
+                                                        @if(isset($passenger['phone']) && $passenger['phone'])
+                                                            | Phone: {{ $passenger['phone'] }}
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="text-sm text-gray-500">Seat</div>
+                                                    <div class="font-bold text-blue-600">{{ $seatNumber }}</div>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="text-right">
-                                            <div class="text-sm text-gray-500">Seat</div>
-                                            <div class="font-bold text-blue-600">{{ $booking->seat_numbers[$index] ?? 'N/A' }}</div>
-                                        </div>
-                                    </div>
+                                    @endif
+                                @endforeach
+                            @else
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <p class="text-red-600">No passenger details found.</p>
                                 </div>
-                            @endforeach
+                            @endif
                         </div>
                     </div>
 
@@ -172,13 +192,13 @@
                         </div>
                     </div>
 
-                    <!-- QR Code -->
+                    <!-- Verification -->
                     <div class="text-center mb-6">
-                        <div class="text-sm text-gray-500 mb-3">Verification QR Code</div>
+                        <div class="text-sm text-gray-500 mb-3">Booking Reference</div>
                         <div class="bg-white p-4 rounded-lg shadow-sm inline-block">
-                            <img src="data:image/png;base64,{{ $qrCodeImage }}" alt="QR Code" class="w-32 h-32 mx-auto">
+                            <div class="text-2xl font-bold text-gray-900">{{ $booking->booking_reference }}</div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">Scan for ticket verification</p>
+                        <p class="text-xs text-gray-500 mt-2">Show this reference for verification</p>
                     </div>
 
                     <!-- Amount -->
@@ -250,5 +270,133 @@
         background: white !important;
     }
 }
+
+/* Compact Print Styles */
+@media print {
+    .compact-ticket {
+        width: 380px !important;
+        max-width: 380px !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+        margin: 0 !important;
+        padding: 10px !important;
+    }
+
+    .compact-header {
+        text-align: center !important;
+        border-bottom: 1px solid #000 !important;
+        padding-bottom: 5px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .compact-title {
+        font-size: 16px !important;
+        font-weight: bold !important;
+        margin: 0 !important;
+    }
+
+    .compact-ref {
+        font-size: 18px !important;
+        font-weight: bold !important;
+        font-family: monospace !important;
+        text-align: center !important;
+        margin: 5px 0 !important;
+        padding: 3px !important;
+        border: 1px solid #000 !important;
+    }
+
+    .compact-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        margin: 2px 0 !important;
+        font-size: 11px !important;
+    }
+
+    .compact-passengers {
+        margin: 8px 0 !important;
+        border-top: 1px solid #000 !important;
+        padding-top: 5px !important;
+    }
+
+    .compact-passenger {
+        font-size: 10px !important;
+        margin: 1px 0 !important;
+    }
+}
 </style>
+
+<script>
+function printCompactTicket() {
+    // Create compact ticket HTML
+    const compactTicket = `
+        <div class="compact-ticket">
+            <div class="compact-header">
+                <div class="compact-title">BookNGO</div>
+                <div style="font-size: 10px;">Bus Ticket</div>
+            </div>
+
+            <div class="compact-ref">{{ $booking->booking_reference }}</div>
+
+            <div class="compact-row">
+                <span>{{ $booking->schedule->route->sourceCity->name }}</span>
+                <span>→</span>
+                <span>{{ $booking->schedule->route->destinationCity->name }}</span>
+            </div>
+
+            <div class="compact-row">
+                <span>{{ $booking->schedule->travel_date->format('M d, Y') }}</span>
+                <span>{{ $booking->schedule->departure_time->format('H:i') }}</span>
+            </div>
+
+            <div class="compact-row">
+                <span>Bus: {{ $booking->schedule->bus->bus_number }}</span>
+                <span>Seats: {{ implode(', ', $booking->seat_numbers) }}</span>
+            </div>
+
+            <div class="compact-passengers">
+                @foreach($booking->seat_numbers as $index => $seatNumber)
+                    @php
+                        $passenger = $booking->passenger_details[$index] ?? $booking->passenger_details[0] ?? null;
+                    @endphp
+                    @if($passenger)
+                    <div class="compact-passenger">
+                        Seat {{ $seatNumber }}: {{ $passenger['name'] }} ({{ $passenger['age'] }}/{{ strtoupper(substr($passenger['gender'], 0, 1)) }})
+                    </div>
+                    @endif
+                @endforeach
+            </div>
+
+            <div class="compact-row" style="border-top: 1px solid #000; padding-top: 3px; margin-top: 5px;">
+                <span>Total: NPR {{ number_format($booking->total_amount) }}</span>
+                <span>{{ ucfirst($booking->status) }}</span>
+            </div>
+
+            <div style="text-align: center; font-size: 9px; margin-top: 5px;">
+                Show this ticket to conductor
+            </div>
+        </div>
+    `;
+
+    // Open new window and print
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Compact Ticket - {{ $booking->booking_reference }}</title>
+            <style>
+                body { margin: 0; padding: 0; }
+                ${document.querySelector('style').innerHTML}
+            </style>
+        </head>
+        <body>
+            ${compactTicket}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+</script>
+
 @endsection

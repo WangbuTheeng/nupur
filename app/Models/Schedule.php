@@ -170,7 +170,7 @@ class Schedule extends Model
      */
     public function getDepartureDatetimeAttribute()
     {
-        return Carbon::parse($this->travel_date->format('Y-m-d') . ' ' . $this->departure_time);
+        return Carbon::parse($this->travel_date->format('Y-m-d') . ' ' . $this->attributes['departure_time']);
     }
 
     /**
@@ -181,11 +181,28 @@ class Schedule extends Model
         $arrivalDate = $this->travel_date;
 
         // If arrival time is earlier than departure time, it's next day
-        if ($this->departure_time && $this->arrival_time && $this->arrival_time < $this->departure_time) {
+        if ($this->attributes['departure_time'] && $this->attributes['arrival_time'] &&
+            $this->attributes['arrival_time'] < $this->attributes['departure_time']) {
             $arrivalDate = $arrivalDate->addDay();
         }
 
-        return Carbon::parse($arrivalDate->format('Y-m-d') . ' ' . $this->arrival_time);
+        return Carbon::parse($arrivalDate->format('Y-m-d') . ' ' . $this->attributes['arrival_time']);
+    }
+
+    /**
+     * Get departure time as Carbon object for formatting.
+     */
+    public function getDepartureTimeAttribute($value)
+    {
+        return $value ? Carbon::createFromFormat('H:i:s', $value) : null;
+    }
+
+    /**
+     * Get arrival time as Carbon object for formatting.
+     */
+    public function getArrivalTimeAttribute($value)
+    {
+        return $value ? Carbon::createFromFormat('H:i:s', $value) : null;
     }
 
     /**

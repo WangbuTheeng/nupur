@@ -203,15 +203,21 @@
             margin-bottom: 15px;
         }
         
-        .qr-section {
+        .verification-section {
             text-align: center;
         }
-        
-        .qr-code {
+
+        .booking-reference {
             margin: 15px 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px;
+            border: 2px solid #333;
+            display: inline-block;
         }
-        
-        .qr-instruction {
+
+        .verification-instruction {
             font-size: 10px;
             color: #6b7280;
             margin-top: 10px;
@@ -401,14 +407,14 @@
                     Seat(s): {{ implode(', ', $booking->seat_numbers) }}
                 </div>
 
-                <!-- QR Code -->
-                <div class="qr-section">
-                    <div class="section-title">Verification QR Code</div>
-                    <div class="qr-code">
-                        <img src="data:image/png;base64,{{ $qrCodeImage }}" alt="QR Code" style="width: 150px; height: 150px;">
+                <!-- Verification -->
+                <div class="verification-section">
+                    <div class="section-title">Ticket Verification</div>
+                    <div class="booking-reference">
+                        {{ $booking->booking_reference }}
                     </div>
-                    <div class="qr-instruction">
-                        Scan this QR code for ticket verification
+                    <div class="verification-instruction">
+                        Show this booking reference for ticket verification
                     </div>
                 </div>
 

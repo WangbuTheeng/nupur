@@ -559,7 +559,11 @@ class BusController extends Controller
      */
     public function suggestRoute()
     {
-        $cities = City::where('is_active', true)->orderBy('name')->get();
+        $cities = City::active()
+            ->orderBy('name')
+            ->get()
+            ->unique('name') // Remove duplicates by name
+            ->values(); // Reset array keys
         return view('operator.routes.suggest', compact('cities'));
     }
 

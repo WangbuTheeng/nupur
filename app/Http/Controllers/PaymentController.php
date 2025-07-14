@@ -79,43 +79,37 @@ class PaymentController extends Controller
     }
 
     /**
-     * Handle eSewa payment success callback
+     * Handle eSewa payment success callback (v2 API)
      */
     public function esewaSuccess(Request $request)
     {
         try {
             $paymentId = $request->get('payment_id');
-            $refId = $request->get('refId');
-            $oid = $request->get('oid');
-            $amt = $request->get('amt');
+            $encodedData = $request->get('data');
 
-            if (!$paymentId || !$refId || !$oid || !$amt) {
-                return redirect()->route('dashboard')
-                    ->with('error', 'Invalid payment response from eSewa.');
-            }
+            Log::info('eSewa Success Callback', [
+                'payment_id' => $paymentId,
+                'encoded_data' => $encodedData,
+                'all_request_data' => $request->all()
+            ]);
 
-            // Verify payment with eSewa
-            $result = $this->esewaService->verifyPayment($paymentId, $refId, $oid, $amt);
-
-            if ($result['success']) {
-                $payment = $result['payment'];
-                $booking = $payment->booking;
-
-                return redirect()->route('booking.show', $booking)
-                    ->with('success', 'Payment completed successfully! Your booking is confirmed.');
-            } else {
-                return redirect()->route('dashboard')
-                    ->with('error', 'Payment verification failed: ' . $result['message']);
-            }
+            // For now, just show a simple success page
+            return view('payment.simple-success', [
+                'message' => 'Payment completed successfully!',
+                'payment_id' => $paymentId,
+                'encoded_data' => $encodedData
+            ]);
 
         } catch (\Exception $e) {
             Log::error('eSewa payment success handling error', [
                 'request_data' => $request->all(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return redirect()->route('dashboard')
-                ->with('error', 'Payment processing failed. Please contact support.');
+            return view('payment.simple-failure', [
+                'error_message' => 'Payment processing failed. Please contact support.'
+            ]);
         }
     }
 
@@ -127,32 +121,26 @@ class PaymentController extends Controller
         try {
             $paymentId = $request->get('payment_id');
 
-            if ($paymentId) {
-                $payment = Payment::find($paymentId);
-                if ($payment) {
-                    $payment->update([
-                        'status' => 'failed',
-                        'failure_reason' => 'Payment cancelled by user',
-                        'failed_at' => now()
-                    ]);
+            Log::info('eSewa Failure Callback', [
+                'payment_id' => $paymentId,
+                'all_request_data' => $request->all()
+            ]);
 
-                    $booking = $payment->booking;
-                    return redirect()->route('booking.show', $booking)
-                        ->with('error', 'Payment was cancelled. You can try again.');
-                }
-            }
-
-            return redirect()->route('dashboard')
-                ->with('error', 'Payment was cancelled or failed.');
+            return view('payment.simple-failure', [
+                'payment_id' => $paymentId,
+                'error_message' => 'Payment was cancelled or failed. You can try again.'
+            ]);
 
         } catch (\Exception $e) {
             Log::error('eSewa payment failure handling error', [
                 'request_data' => $request->all(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return redirect()->route('dashboard')
-                ->with('error', 'Payment processing failed.');
+            return view('payment.simple-failure', [
+                'error_message' => 'Payment processing failed. Please contact support.'
+            ]);
         }
     }
 
@@ -184,5 +172,62 @@ class PaymentController extends Controller
             ->paginate(10);
 
         return view('payments.history', compact('payments'));
+    }
+
+    /**
+     * Check eSewa payment status using status check API
+     */
+    public function checkEsewaStatus(Payment $payment)
+    {
+        try {
+            // Ensure user owns the payment
+            if ($payment->user_id !== Auth::id()) {
+                abort(403, 'Unauthorized access to payment');
+            }
+
+            if ($payment->payment_method !== 'esewa') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This is not an eSewa payment'
+                ], 400);
+            }
+
+            $result = $this->esewaService->checkPaymentStatus(
+                $payment->transaction_id,
+                $payment->amount
+            );
+
+            // If status check shows payment is complete but our record shows pending,
+            // update the payment status
+            if ($result['success'] && $result['status'] === 'COMPLETE' && $payment->status === 'pending') {
+                $payment->update([
+                    'status' => 'completed',
+                    'gateway_transaction_id' => $result['data']['ref_id'] ?? null,
+                    'gateway_response' => $result['data'],
+                    'paid_at' => now(),
+                ]);
+
+                // Update booking status
+                $booking = $payment->booking;
+                $booking->update([
+                    'status' => 'confirmed',
+                    'payment_status' => 'paid',
+                ]);
+            }
+
+            return response()->json($result);
+
+        } catch (\Exception $e) {
+            Log::error('eSewa status check error', [
+                'payment_id' => $payment->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check eSewa payment status'
+            ], 500);
+        }
     }
 }

@@ -13,6 +13,8 @@ class EsewaPaymentService
     private $merchantId;
     private $secretKey;
     private $baseUrl;
+    private $paymentUrl;
+    private $statusCheckUrl;
     private $successUrl;
     private $failureUrl;
 
@@ -21,12 +23,14 @@ class EsewaPaymentService
         $this->merchantId = config('services.esewa.merchant_id');
         $this->secretKey = config('services.esewa.secret_key');
         $this->baseUrl = config('services.esewa.base_url');
+        $this->paymentUrl = config('services.esewa.payment_url');
+        $this->statusCheckUrl = config('services.esewa.status_check_url');
         $this->successUrl = config('services.esewa.success_url');
         $this->failureUrl = config('services.esewa.failure_url');
     }
 
     /**
-     * Initiate payment with eSewa
+     * Initiate payment with eSewa v2 API
      */
     public function initiatePayment(Booking $booking, array $additionalData = [])
     {
@@ -43,18 +47,43 @@ class EsewaPaymentService
                 'gateway_data' => $additionalData,
             ]);
 
-            // Prepare eSewa payment data
+            // Prepare eSewa v2 payment data
+            // Convert amounts to integers (eSewa expects integer values, not decimals)
+            $amount = (int) $booking->total_amount;
+            $taxAmount = 0; // No tax for now
+            $serviceCharge = 0; // No service charge for now
+            $deliveryCharge = 0; // No delivery charge for now
+            $totalAmount = $amount + $taxAmount + $serviceCharge + $deliveryCharge;
+
             $paymentData = [
-                'amt' => $booking->total_amount,
-                'pdc' => 0, // Delivery charge
-                'psc' => 0, // Service charge
-                'txAmt' => 0, // Tax amount
-                'tAmt' => $booking->total_amount, // Total amount
-                'pid' => $payment->transaction_id,
-                'scd' => $this->merchantId,
-                'su' => $this->successUrl . '?payment_id=' . $payment->id,
-                'fu' => $this->failureUrl . '?payment_id=' . $payment->id,
+                'amount' => $amount,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+                'transaction_uuid' => $payment->transaction_id,
+                'product_code' => $this->merchantId,
+                'product_service_charge' => $serviceCharge,
+                'product_delivery_charge' => $deliveryCharge,
+                'success_url' => $this->successUrl . '?payment_id=' . $payment->id,
+                'failure_url' => $this->failureUrl . '?payment_id=' . $payment->id,
+                'signed_field_names' => 'total_amount,transaction_uuid,product_code',
             ];
+
+            // Generate signature
+            $paymentData['signature'] = $this->generateSignature($paymentData);
+
+            // Log payment data for debugging
+            Log::info('eSewa Payment Initiation', [
+                'booking_id' => $booking->id,
+                'payment_id' => $payment->id,
+                'transaction_id' => $payment->transaction_id,
+                'amount' => $amount,
+                'total_amount' => $totalAmount,
+                'merchant_id' => $this->merchantId,
+                'payment_url' => $this->paymentUrl,
+                'success_url' => $paymentData['success_url'],
+                'failure_url' => $paymentData['failure_url'],
+                'signature_generated' => true
+            ]);
 
             // Generate form HTML for eSewa
             $formHtml = $this->generatePaymentForm($paymentData);
@@ -82,54 +111,51 @@ class EsewaPaymentService
     }
 
     /**
-     * Verify payment with eSewa
+     * Verify payment with eSewa v2 API using Base64 encoded response
      */
-    public function verifyPayment($paymentId, $refId, $oid, $amt)
+    public function verifyPayment($paymentId, $encodedData)
     {
         try {
             $payment = Payment::findOrFail($paymentId);
-            
-            // Prepare verification data
-            $verificationData = [
-                'amt' => $amt,
-                'rid' => $refId,
-                'pid' => $oid,
-                'scd' => $this->merchantId,
-            ];
 
-            // Make verification request to eSewa
-            $response = Http::asForm()->post($this->baseUrl . '/epay/transrec', $verificationData);
+            // Decode Base64 response
+            $decodedData = base64_decode($encodedData);
+            $responseData = json_decode($decodedData, true);
 
-            if ($response->successful()) {
-                $responseBody = $response->body();
-                
-                if (strpos($responseBody, 'Success') !== false) {
-                    // Payment verified successfully
-                    $this->handleSuccessfulPayment($payment, $refId, $responseBody);
-                    
-                    return [
-                        'success' => true,
-                        'message' => 'Payment verified successfully',
-                        'payment' => $payment->fresh(),
-                    ];
-                } else {
-                    // Payment verification failed
-                    $this->handleFailedPayment($payment, 'Verification failed: ' . $responseBody);
-                    
-                    return [
-                        'success' => false,
-                        'message' => 'Payment verification failed',
-                        'error' => $responseBody
-                    ];
-                }
+            if (!$responseData) {
+                throw new \Exception('Invalid response data from eSewa');
+            }
+
+            // Verify signature
+            if (!$this->verifyResponseSignature($responseData)) {
+                throw new \Exception('Response signature verification failed');
+            }
+
+            // Check if payment was successful
+            if ($responseData['status'] === 'COMPLETE') {
+                // Payment verified successfully
+                $this->handleSuccessfulPayment($payment, $responseData['transaction_code'], $responseData);
+
+                return [
+                    'success' => true,
+                    'message' => 'Payment verified successfully',
+                    'payment' => $payment->fresh(),
+                ];
             } else {
-                throw new \Exception('eSewa API request failed: ' . $response->status());
+                // Payment verification failed
+                $this->handleFailedPayment($payment, 'Payment status: ' . $responseData['status']);
+
+                return [
+                    'success' => false,
+                    'message' => 'Payment verification failed',
+                    'error' => 'Payment status: ' . $responseData['status']
+                ];
             }
 
         } catch (\Exception $e) {
             Log::error('eSewa payment verification failed', [
                 'payment_id' => $paymentId,
-                'ref_id' => $refId,
+                'encoded_data' => $encodedData,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -137,6 +163,47 @@ class EsewaPaymentService
             return [
                 'success' => false,
                 'message' => 'Payment verification failed. Please contact support.',
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Check payment status using eSewa status check API
+     */
+    public function checkPaymentStatus($transactionUuid, $totalAmount)
+    {
+        try {
+            $url = $this->statusCheckUrl . '?' . http_build_query([
+                'product_code' => $this->merchantId,
+                'total_amount' => $totalAmount,
+                'transaction_uuid' => $transactionUuid,
+            ]);
+
+            $response = Http::get($url);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+
+                return [
+                    'success' => true,
+                    'status' => $responseData['status'],
+                    'data' => $responseData,
+                ];
+            } else {
+                throw new \Exception('Status check API request failed: ' . $response->status());
+            }
+
+        } catch (\Exception $e) {
+            Log::error('eSewa status check failed', [
+                'transaction_uuid' => $transactionUuid,
+                'total_amount' => $totalAmount,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Status check failed',
                 'error' => $e->getMessage()
             ];
         }
@@ -201,7 +268,92 @@ class EsewaPaymentService
     }
 
     /**
-     * Generate payment form HTML
+     * Generate HMAC SHA256 signature for eSewa v2 API
+     * Based on eSewa documentation and common working implementations
+     */
+    private function generateSignature($paymentData)
+    {
+        try {
+            // eSewa v2 signature format: total_amount,transaction_uuid,product_code
+            $message = sprintf(
+                'total_amount=%s,transaction_uuid=%s,product_code=%s',
+                $paymentData['total_amount'],
+                $paymentData['transaction_uuid'],
+                $paymentData['product_code']
+            );
+
+            // Log the message for debugging
+            Log::info('eSewa Signature Generation', [
+                'message' => $message,
+                'secret_key' => substr($this->secretKey, 0, 5) . '***', // Partial key for security
+                'payment_data' => [
+                    'total_amount' => $paymentData['total_amount'],
+                    'transaction_uuid' => $paymentData['transaction_uuid'],
+                    'product_code' => $paymentData['product_code']
+                ]
+            ]);
+
+            // Generate HMAC SHA256 signature
+            $signature = hash_hmac('sha256', $message, $this->secretKey, true);
+            $signatureBase64 = base64_encode($signature);
+
+            Log::info('eSewa Signature Generated', [
+                'signature' => $signatureBase64,
+                'message_length' => strlen($message),
+                'message' => $message
+            ]);
+
+            return $signatureBase64;
+
+        } catch (\Exception $e) {
+            Log::error('eSewa Signature Generation Failed', [
+                'error' => $e->getMessage(),
+                'payment_data' => $paymentData,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Verify response signature from eSewa
+     */
+    private function verifyResponseSignature($responseData)
+    {
+        if (!isset($responseData['signed_field_names']) || !isset($responseData['signature'])) {
+            return false;
+        }
+
+        // Create message from signed field names using values separated by commas
+        $signedFieldNames = explode(',', $responseData['signed_field_names']);
+        $values = [];
+
+        foreach ($signedFieldNames as $field) {
+            $fieldName = trim($field);
+            if (isset($responseData[$fieldName])) {
+                $values[] = $responseData[$fieldName];
+            }
+        }
+
+        $message = implode(',', $values);
+
+        // Log for debugging
+        \Log::info('eSewa Response Signature Verification', [
+            'message' => $message,
+            'received_signature' => $responseData['signature'],
+            'signed_fields' => $responseData['signed_field_names']
+        ]);
+
+        // Generate expected signature
+        $expectedSignature = hash_hmac('sha256', $message, $this->secretKey, true);
+        $expectedSignatureBase64 = base64_encode($expectedSignature);
+
+        // Compare signatures
+        return hash_equals($expectedSignatureBase64, $responseData['signature']);
+    }
+
+    /**
+     * Generate payment form HTML for eSewa v2 API
      */
     private function generatePaymentForm($paymentData)
     {
@@ -211,21 +363,20 @@ class EsewaPaymentService
         }
 
         return '
-        <form id="esewa-payment-form" action="' . $this->baseUrl . '/epay/main" method="POST">
+        <form id="esewa-payment-form" action="' . $this->paymentUrl . '" method="POST">
             ' . $formFields . '
             <button type="submit" class="btn btn-primary">Pay with eSewa</button>
-        </form>
-        <script>
-            document.getElementById("esewa-payment-form").submit();
-        </script>';
+        </form>';
     }
 
     /**
      * Generate unique transaction ID
+     * Format: YYMMDD-HHMMSS (e.g., 250714-143022)
+     * Follows eSewa documentation requirements: alphanumeric and hyphen only
      */
     private function generateTransactionId()
     {
-        return 'BNG_' . time() . '_' . Str::random(8);
+        return date('ymd-His');
     }
 
     /**

@@ -75,11 +75,20 @@ class CounterController extends Controller
             })
             ->unique();
 
-        $cities = City::whereIn('id', $cityIds)->orderBy('name')->get();
+        $cities = City::active()
+            ->whereIn('id', $cityIds)
+            ->orderBy('name')
+            ->get()
+            ->unique('name') // Remove duplicates by name
+            ->values(); // Reset array keys
 
-        // Fallback to all cities if operator has no routes
+        // Fallback to active cities if operator has no routes
         if ($cities->isEmpty()) {
-            $cities = City::orderBy('name')->get();
+            $cities = City::active()
+                ->orderBy('name')
+                ->get()
+                ->unique('name') // Remove duplicates by name
+                ->values(); // Reset array keys
         }
 
         return view('operator.counter.search', compact('cities'));

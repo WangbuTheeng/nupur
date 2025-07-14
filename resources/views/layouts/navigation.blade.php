@@ -171,7 +171,7 @@
 
                         <!-- Menu Items -->
                         <div class="py-2">
-                            <a href="{{ route('profile.edit') }}"
+                            <a href="{{ Auth::user()->hasRole('admin') ? route('profile.edit') : route('customer.profile.edit') }}"
                                @click="closeAllDropdowns()"
                                class="dropdown-item flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -339,7 +339,7 @@
             </div>
 
             <div class="space-y-2">
-                <a href="{{ route('profile.edit') }}"
+                <a href="{{ Auth::user()->hasRole('admin') ? route('profile.edit') : route('customer.profile.edit') }}"
                    class="flex items-center px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>

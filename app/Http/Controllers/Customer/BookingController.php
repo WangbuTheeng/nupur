@@ -176,11 +176,10 @@ class BookingController extends Controller
     {
         $request->validate([
             'schedule_id' => 'required|exists:schedules,id',
-            'passengers' => 'required|array|min:1',
-            'passengers.*.name' => 'required|string|max:255',
-            'passengers.*.age' => 'required|integer|min:1|max:120',
-            'passengers.*.gender' => 'required|in:male,female,other',
-            'passengers.*.phone' => 'nullable|string|max:20',
+            'primary_passenger_name' => 'required|string|max:255',
+            'primary_passenger_age' => 'required|integer|min:1|max:120',
+            'primary_passenger_gender' => 'required|in:male,female,other',
+            'primary_passenger_phone' => 'nullable|string|max:20',
             'contact_phone' => 'required|string|max:20',
             'contact_email' => 'required|email|max:255',
             'special_requests' => 'nullable|string|max:500',
@@ -206,18 +205,39 @@ class BookingController extends Controller
             return back()->with('error', 'Seat reservation expired. Please start booking again.');
         }
 
-        // Validate passenger count matches seat count
-        if (count($request->passengers) !== count($reservation['seat_numbers'])) {
+        // Validate reservation exists and has seat numbers
+        if (!$reservation || !isset($reservation['seat_numbers']) || empty($reservation['seat_numbers'])) {
             return back()->withInput()
-                ->with('error', 'Number of passengers must match number of selected seats.');
+                ->with('error', 'Invalid seat reservation. Please select seats again.');
         }
 
         DB::beginTransaction();
         try {
             // Calculate total amount
-            $passengerCount = count($request->passengers);
+            $seatNumbers = $reservation['seat_numbers'] ?? [];
+            $passengerCount = count($seatNumbers);
+
+            if ($passengerCount === 0) {
+                return back()->withInput()
+                    ->with('error', 'No seats found in reservation. Please select seats again.');
+            }
+
             $farePerSeat = $schedule->fare;
             $totalAmount = $farePerSeat * $passengerCount;
+
+            // Create passenger details array using primary passenger for all seats
+            $primaryPassenger = [
+                'name' => $request->primary_passenger_name,
+                'age' => $request->primary_passenger_age,
+                'gender' => $request->primary_passenger_gender,
+                'phone' => $request->primary_passenger_phone,
+            ];
+
+            // Create passenger details array - same primary passenger for all seats
+            $passengerDetails = [];
+            for ($i = 0; $i < $passengerCount; $i++) {
+                $passengerDetails[] = $primaryPassenger;
+            }
 
             // Create booking
             $booking = Booking::create([
@@ -225,8 +245,8 @@ class BookingController extends Controller
                 'user_id' => Auth::id(),
                 'schedule_id' => $schedule->id,
                 'passenger_count' => $passengerCount,
-                'seat_numbers' => $reservation['seat_numbers'],
-                'passenger_details' => $request->passengers,
+                'seat_numbers' => $seatNumbers,
+                'passenger_details' => $passengerDetails,
                 'contact_phone' => $request->contact_phone,
                 'contact_email' => $request->contact_email,
                 'total_amount' => $totalAmount,
@@ -240,7 +260,7 @@ class BookingController extends Controller
             $schedule->decrement('available_seats', $passengerCount);
 
             // Fire seat update events for each booked seat
-            foreach ($reservation['seat_numbers'] as $seatNumber) {
+            foreach ($seatNumbers as $seatNumber) {
                 event(new SeatUpdated($schedule, $seatNumber, 'booked', Auth::id()));
             }
 

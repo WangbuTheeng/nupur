@@ -119,25 +119,28 @@
             color: #333;
         }
         
-        .qr-section {
+        .verification-section {
             text-align: center;
             padding: 20px;
             background-color: #f8f9fa;
             border-radius: 8px;
             margin-bottom: 30px;
         }
-        
-        .qr-section h3 {
+
+        .verification-section h3 {
             color: #333;
             margin-bottom: 15px;
         }
-        
-        .qr-code {
+
+        .booking-ref {
             display: inline-block;
             padding: 15px;
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
         }
         
         .instructions {
@@ -308,14 +311,14 @@
                 </table>
             </div>
             
-            <!-- QR Code -->
-            <div class="qr-section">
-                <h3>Verification QR Code</h3>
-                <div class="qr-code">
-                    <img src="{{ $qrCodeDataUri }}" alt="QR Code" style="width: 200px; height: 200px;">
+            <!-- Verification -->
+            <div class="verification-section">
+                <h3>Ticket Verification</h3>
+                <div class="booking-ref">
+                    {{ $booking->booking_reference }}
                 </div>
                 <p style="margin-top: 10px; color: #666; font-size: 14px;">
-                    Show this QR code to the bus conductor for verification
+                    Show this booking reference to the bus conductor for verification
                 </p>
             </div>
             

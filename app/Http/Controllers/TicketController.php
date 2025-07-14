@@ -5,15 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
-use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelLow;
-use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeModeMargin;
-use Endroid\QrCode\Color\Color;
+
 
 class TicketController extends Controller
 {
+    /**
+     * Show ticket verification form.
+     */
+    public function showVerifyForm(Request $request)
+    {
+        $bookingReference = $request->get('ref');
+        return view('tickets.verify', compact('bookingReference'));
+    }
+
     /**
      * Generate and download ticket for a booking.
      */
@@ -31,24 +35,8 @@ class TicketController extends Controller
 
         $booking->load(['schedule.route', 'schedule.bus', 'user']);
 
-        // Generate QR code data
-        $qrData = $this->generateQrData($booking);
-        
-        // Create QR code
-        $qrCode = QrCode::create($qrData)
-            ->setEncoding(new Encoding('UTF-8'))
-            ->setErrorCorrectionLevel(new ErrorCorrectionLevelLow())
-            ->setSize(200)
-            ->setMargin(10)
-            ->setRoundBlockSizeMode(new RoundBlockSizeModeMargin())
-            ->setForegroundColor(new Color(0, 0, 0))
-            ->setBackgroundColor(new Color(255, 255, 255));
-
-        $writer = new PngWriter();
-        $result = $writer->write($qrCode);
-
         // Generate ticket HTML
-        $ticketHtml = $this->generateTicketHtml($booking, $result->getDataUri());
+        $ticketHtml = $this->generateTicketHtml($booking);
 
         return response($ticketHtml)
             ->header('Content-Type', 'text/html')
@@ -72,23 +60,7 @@ class TicketController extends Controller
 
         $booking->load(['schedule.route', 'schedule.bus', 'user']);
 
-        // Generate QR code data
-        $qrData = $this->generateQrData($booking);
-        
-        // Create QR code
-        $qrCode = QrCode::create($qrData)
-            ->setEncoding(new Encoding('UTF-8'))
-            ->setErrorCorrectionLevel(new ErrorCorrectionLevelLow())
-            ->setSize(200)
-            ->setMargin(10)
-            ->setRoundBlockSizeMode(new RoundBlockSizeModeMargin())
-            ->setForegroundColor(new Color(0, 0, 0))
-            ->setBackgroundColor(new Color(255, 255, 255));
-
-        $writer = new PngWriter();
-        $result = $writer->write($qrCode);
-
-        return view('tickets.view', compact('booking', 'qrData'))->with('qrCodeDataUri', $result->getDataUri());
+        return view('tickets.view', compact('booking'));
     }
 
     /**
@@ -185,34 +157,13 @@ class TicketController extends Controller
         }
     }
 
-    /**
-     * Generate QR code data for a booking.
-     */
-    private function generateQrData(Booking $booking)
-    {
-        $data = [
-            'booking_reference' => $booking->booking_reference,
-            'user_id' => $booking->user_id,
-            'schedule_id' => $booking->schedule_id,
-            'seats' => $booking->seat_numbers,
-            'passenger_count' => $booking->passenger_count,
-            'total_amount' => $booking->total_amount,
-            'travel_date' => $booking->schedule->travel_date->format('Y-m-d'),
-            'departure_time' => $booking->schedule->departure_time->format('H:i:s'),
-            'route' => $booking->schedule->route->full_name,
-            'bus' => $booking->schedule->bus->bus_number,
-            'generated_at' => now()->toISOString(),
-            'verification_hash' => hash('sha256', $booking->booking_reference . $booking->user_id . $booking->total_amount)
-        ];
 
-        return json_encode($data);
-    }
 
     /**
      * Generate ticket HTML.
      */
-    private function generateTicketHtml(Booking $booking, $qrCodeDataUri)
+    private function generateTicketHtml(Booking $booking)
     {
-        return view('tickets.template', compact('booking', 'qrCodeDataUri'))->render();
+        return view('tickets.template', compact('booking'))->render();
     }
 }
