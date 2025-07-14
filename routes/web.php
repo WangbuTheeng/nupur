@@ -24,6 +24,11 @@ Route::get('/demo/modern-navbar', function () {
     return view('demo.modern-navbar');
 })->name('demo.modern-navbar');
 
+// Test route for navbar functionality
+Route::get('/test/navbar', function () {
+    return view('test-navbar');
+})->name('test.navbar');
+
 // Debug route to check bus data
 Route::get('/debug/bus-data', function () {
     $bus = App\Models\Bus::first();

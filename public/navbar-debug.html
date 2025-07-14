@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navbar Debug - Vanilla JS</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .debug { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .success { border-left: 4px solid #10b981; }
+        .error { border-left: 4px solid #ef4444; }
+        .warning { border-left: 4px solid #f59e0b; }
+        button { padding: 10px 15px; margin: 5px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #2563eb; }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-menu { position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ccc; padding: 10px; min-width: 200px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Navbar Debug Tool - Vanilla JavaScript</h1>
+
+    <div class="debug success">
+        <h3>✅ Vanilla JavaScript Implementation</h3>
+        <p>No Alpine.js dependencies - Pure JavaScript solution</p>
+    </div>
+
+    <div class="debug">
+        <h3>🧪 Interactive Test</h3>
+        <div id="test-navbar">
+            <div class="dropdown">
+                <button @click="toggleUserDropdown()">
+                    User Menu (Open: <span x-text="userDropdownOpen"></span>)
+                </button>
+                <div x-show="userDropdownOpen" @click.away="userDropdownOpen = false" x-transition class="dropdown-menu">
+                    <p>✅ User dropdown is working!</p>
+                    <button @click="closeAllDropdowns()">Close All</button>
+                </div>
+            </div>
+            
+            <div class="dropdown" style="margin-left: 20px;">
+                <button @click="toggleNotificationDropdown()">
+                    Notifications (Open: <span x-text="notificationOpen"></span>)
+                </button>
+                <div x-show="notificationOpen" @click.away="notificationOpen = false" x-transition class="dropdown-menu">
+                    <p>✅ Notification dropdown is working!</p>
+                    <button @click="closeAllDropdowns()">Close All</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button @click="toggleMobileMenu()">
+                    Mobile Menu (Open: <span x-text="mobileOpen"></span>)
+                </button>
+            </div>
+            
+            <div class="debug" style="margin-top: 20px;">
+                <h4>Live Component State:</h4>
+                <p>User Dropdown: <span x-text="userDropdownOpen ? '🟢 OPEN' : '🔴 CLOSED'"></span></p>
+                <p>Notification Dropdown: <span x-text="notificationOpen ? '🟢 OPEN' : '🔴 CLOSED'"></span></p>
+                <p>Mobile Menu: <span x-text="mobileOpen ? '🟢 OPEN' : '🔴 CLOSED'"></span></p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Register the exact same component as in the Laravel app
+        document.addEventListener('alpine:init', () => {
+            console.log('🎯 Alpine init - registering navbarDropdowns');
+            
+            Alpine.data('navbarDropdowns', () => ({
+                userDropdownOpen: false,
+                notificationOpen: false,
+                mobileOpen: false,
+
+                init() {
+                    console.log('✅ Component initialized successfully');
+                    document.getElementById('component-status').innerHTML = '<span class="success">✅ Component registered and initialized successfully!</span>';
+                },
+
+                closeAllDropdowns() {
+                    console.log('🔒 Closing all dropdowns');
+                    this.userDropdownOpen = false;
+                    this.notificationOpen = false;
+                },
+
+                toggleUserDropdown() {
+                    console.log('👤 Toggling user dropdown');
+                    this.notificationOpen = false;
+                    this.userDropdownOpen = !this.userDropdownOpen;
+                },
+
+                toggleNotificationDropdown() {
+                    console.log('🔔 Toggling notification dropdown');
+                    this.userDropdownOpen = false;
+                    this.notificationOpen = !this.notificationOpen;
+                },
+
+                toggleMobileMenu() {
+                    console.log('📱 Toggling mobile menu');
+                    this.mobileOpen = !this.mobileOpen;
+                    if (this.mobileOpen) {
+                        this.closeAllDropdowns();
+                    }
+                }
+            }));
+        });
+        
+        // Check Alpine status
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const alpineStatus = document.getElementById('alpine-status');
+                const componentStatus = document.getElementById('component-status');
+                
+                if (typeof Alpine !== 'undefined') {
+                    alpineStatus.innerHTML = `<span class="success">✅ Alpine.js loaded! Version: ${Alpine.version || 'unknown'}</span>`;
+                    
+                    // Check if component is registered
+                    try {
+                        const testComponent = Alpine.data('navbarDropdowns');
+                        if (testComponent) {
+                            componentStatus.innerHTML = '<span class="success">✅ navbarDropdowns component found!</span>';
+                        } else {
+                            componentStatus.innerHTML = '<span class="error">❌ navbarDropdowns component NOT found!</span>';
+                        }
+                    } catch (e) {
+                        componentStatus.innerHTML = `<span class="error">❌ Error checking component: ${e.message}</span>`;
+                    }
+                } else {
+                    alpineStatus.innerHTML = '<span class="error">❌ Alpine.js not found!</span>';
+                    componentStatus.innerHTML = '<span class="error">❌ Cannot check component - Alpine.js not available</span>';
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

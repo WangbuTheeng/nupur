@@ -422,6 +422,12 @@
     @endif
 </div>
 
+<!-- Alpine.js Test Component -->
+<div x-data="{ test: 'Alpine.js is working!' }" class="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg z-50">
+    <span x-text="test"></span>
+    <button @click="test = 'Button clicked!'" class="ml-2 bg-green-700 px-2 py-1 rounded text-xs">Test</button>
+</div>
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {

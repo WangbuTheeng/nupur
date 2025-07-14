@@ -1,0 +1,201 @@
+/* Enhanced Navbar Dropdown Styles */
+
+/* Alpine.js cloak - hide elements until Alpine.js loads */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Smooth dropdown animations */
+.dropdown-enter {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+}
+
+.dropdown-enter-active {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transition: all 0.2s ease-out;
+}
+
+.dropdown-leave {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.dropdown-leave-active {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+    transition: all 0.15s ease-in;
+}
+
+/* Enhanced dropdown shadow */
+.dropdown-shadow {
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Notification badge pulse animation */
+.notification-badge {
+    animation: pulse-notification 2s infinite;
+}
+
+@keyframes pulse-notification {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.1);
+    }
+}
+
+/* Mobile menu slide animation */
+.mobile-menu-enter {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.mobile-menu-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.3s ease-out;
+}
+
+.mobile-menu-leave {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.mobile-menu-leave-active {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.2s ease-in;
+}
+
+/* Backdrop blur for mobile menu */
+.mobile-backdrop {
+    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced hover states */
+.nav-item-hover {
+    transition: all 0.2s ease-in-out;
+}
+
+.nav-item-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Dropdown item hover effect */
+.dropdown-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.dropdown-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.dropdown-item:hover::before {
+    left: 100%;
+}
+
+/* Focus states for accessibility */
+.dropdown-item:focus,
+.nav-button:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Smooth logo animation */
+.logo-container {
+    transition: all 0.3s ease-in-out;
+}
+
+.logo-container:hover {
+    transform: scale(1.05);
+}
+
+/* Notification count badge */
+.notification-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    border: 2px solid white;
+    animation: bounce-in 0.5s ease-out;
+}
+
+@keyframes bounce-in {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Responsive improvements */
+@media (max-width: 1024px) {
+    .dropdown-shadow {
+        box-shadow:
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* Mobile dropdown positioning */
+@media (max-width: 640px) {
+    /* Ensure dropdowns don't overflow on mobile */
+    .dropdown-shadow {
+        max-width: calc(100vw - 2rem);
+        left: auto;
+        right: 1rem;
+    }
+
+    /* Mobile navigation improvements */
+    .mobile-nav-item {
+        padding: 0.75rem 1rem;
+        margin: 0.25rem 0;
+    }
+
+    /* Better touch targets */
+    .nav-button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+    .dropdown-shadow {
+        box-shadow: 
+            0 20px 25px -5px rgba(0, 0, 0, 0.3),
+            0 10px 10px -5px rgba(0, 0, 0, 0.2),
+            0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+}

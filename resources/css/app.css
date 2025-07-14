@@ -1,8 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Import custom styles */
+/* Import custom styles first */
+@import './navbar.css';
 @import './seat-map.css';
 @import './realtime-dashboard.css';
 @import './realtime-notifications.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
