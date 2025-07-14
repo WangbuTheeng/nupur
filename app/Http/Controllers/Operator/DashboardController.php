@@ -10,6 +10,7 @@ use App\Models\Route;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -56,19 +57,20 @@ class DashboardController extends Controller
           ->where('status', 'confirmed')
           ->sum('total_amount');
 
-        // Get recent bookings
+        // Get recent bookings (top 5)
         $recentBookings = Booking::whereHas('schedule', function($query) use ($operator) {
             $query->where('operator_id', $operator->id);
         })->with(['user', 'schedule.route', 'schedule.bus'])
           ->orderBy('created_at', 'desc')
-          ->limit(10)
+          ->limit(5)
           ->get();
 
-        // Get today's schedules
+        // Get today's schedules (top 5)
         $todaySchedules = Schedule::where('operator_id', $operator->id)
             ->whereDate('travel_date', $today)
             ->with(['route', 'bus', 'bookings'])
             ->orderBy('departure_time')
+            ->limit(5)
             ->get();
 
         // Get fleet statistics
@@ -302,5 +304,125 @@ class DashboardController extends Controller
             'success' => true,
             'fleet_utilization' => $busStats->values(),
         ]);
+    }
+
+    /**
+     * Show the operator profile page.
+     */
+    public function profile()
+    {
+        $operator = Auth::user();
+
+        // Initialize settings if not set
+        if (empty($operator->settings)) {
+            $operator->update([
+                'settings' => [
+                    'notification_email' => true,
+                    'notification_sms' => false,
+                    'auto_confirm_bookings' => false,
+                    'booking_cutoff_minutes' => 10,
+                    'default_cancellation_policy' => 'Cancellation allowed up to 24 hours before departure with 10% cancellation fee.',
+                ]
+            ]);
+            $operator->refresh();
+        }
+
+        return view('operator.profile.index', compact('operator'));
+    }
+
+    /**
+     * Update the operator profile.
+     */
+    public function updateProfile(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $operator->id,
+            'phone' => 'nullable|string|max:20',
+            'company_name' => 'nullable|string|max:255',
+            'company_address' => 'nullable|string|max:500',
+            'company_phone' => 'nullable|string|max:20',
+            'company_email' => 'nullable|email|max:255',
+            'license_number' => 'nullable|string|max:100',
+            'current_password' => 'nullable|required_with:password|current_password',
+            'password' => 'nullable|min:8|confirmed',
+        ]);
+
+        // Update basic profile information
+        $operator->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'company_name' => $request->company_name,
+            'company_address' => $request->company_address,
+            'company_phone' => $request->company_phone,
+            'company_email' => $request->company_email,
+            'license_number' => $request->license_number,
+        ]);
+
+        // Update password if provided
+        if ($request->filled('password')) {
+            $operator->update([
+                'password' => Hash::make($request->password),
+            ]);
+        }
+
+        return back()->with('success', 'Profile updated successfully!');
+    }
+
+    /**
+     * Show the operator settings page.
+     */
+    public function settings()
+    {
+        $operator = Auth::user();
+
+        // Initialize settings if not set
+        if (empty($operator->settings)) {
+            $operator->update([
+                'settings' => [
+                    'notification_email' => true,
+                    'notification_sms' => false,
+                    'auto_confirm_bookings' => false,
+                    'booking_cutoff_minutes' => 10,
+                    'default_cancellation_policy' => 'Cancellation allowed up to 24 hours before departure with 10% cancellation fee.',
+                ]
+            ]);
+            $operator->refresh();
+        }
+
+        return view('operator.settings.index', compact('operator'));
+    }
+
+    /**
+     * Update the operator settings.
+     */
+    public function updateSettings(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'notification_email' => 'boolean',
+            'notification_sms' => 'boolean',
+            'auto_confirm_bookings' => 'boolean',
+            'booking_cutoff_minutes' => 'integer|min:5|max:120',
+            'default_cancellation_policy' => 'string|max:500',
+        ]);
+
+        // Update operator settings (you might want to store these in a separate settings table)
+        $settings = [
+            'notification_email' => $request->boolean('notification_email'),
+            'notification_sms' => $request->boolean('notification_sms'),
+            'auto_confirm_bookings' => $request->boolean('auto_confirm_bookings'),
+            'booking_cutoff_minutes' => $request->booking_cutoff_minutes ?? 10,
+            'default_cancellation_policy' => $request->default_cancellation_policy,
+        ];
+
+        // Store settings in user's meta or create a settings table
+        $operator->update(['settings' => $settings]);
+
+        return back()->with('success', 'Settings updated successfully!');
     }
 }

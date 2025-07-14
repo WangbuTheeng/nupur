@@ -6,6 +6,7 @@ use App\Http\Controllers\Operator\BookingController;
 use App\Http\Controllers\Operator\CounterController;
 use App\Http\Controllers\Operator\ReportController;
 use App\Http\Controllers\Operator\DashboardController;
+use App\Http\Controllers\Operator\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -96,4 +97,14 @@ Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->
     Route::put('/profile', [DashboardController::class, 'updateProfile'])->name('profile.update');
     Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     Route::put('/settings', [DashboardController::class, 'updateSettings'])->name('settings.update');
+
+    // Notifications
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread', [NotificationController::class, 'unread'])->name('unread');
+        Route::get('/count', [NotificationController::class, 'getCount'])->name('count');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
 });

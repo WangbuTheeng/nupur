@@ -33,6 +33,25 @@ Route::middleware(['auth', 'user'])->group(function () {
     // Customer Dashboard
     Route::get('/customer/dashboard', [DashboardController::class, 'index'])->name('customer.dashboard');
     Route::get('/customer/dashboard/stats', [DashboardController::class, 'stats'])->name('customer.dashboard.stats');
+
+    // Customer Bookings
+    Route::prefix('customer/bookings')->name('customer.bookings.')->group(function () {
+        Route::get('/', [BookingController::class, 'index'])->name('index');
+        Route::get('/upcoming', [BookingController::class, 'upcoming'])->name('upcoming');
+        Route::get('/history', [BookingController::class, 'history'])->name('history');
+        Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
+    });
+
+    // Customer Tickets
+    Route::prefix('customer/tickets')->name('customer.tickets.')->group(function () {
+        Route::get('/{booking}', [TicketController::class, 'show'])->name('show');
+        Route::get('/{booking}/download', [TicketController::class, 'download'])->name('download');
+    });
+
+    // Customer Payments
+    Route::prefix('customer/payments')->name('payments.')->group(function () {
+        Route::get('/history', [PaymentController::class, 'history'])->name('history');
+    });
     
     // Booking Process
     Route::prefix('booking')->name('booking.')->group(function () {

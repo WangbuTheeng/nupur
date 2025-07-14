@@ -186,8 +186,14 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Recent Bookings -->
         <div class="bg-white overflow-hidden shadow-lg rounded-xl">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">Recent Bookings</h3>
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Recent Bookings</h3>
+                    <p class="text-xs text-gray-500 mt-1">Showing latest 5 bookings</p>
+                </div>
+                <a href="{{ route('operator.bookings.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
             </div>
             <div class="p-6">
                 @if($recentBookings->count() > 0)
@@ -230,8 +236,14 @@
 
         <!-- Today's Schedules -->
         <div class="bg-white overflow-hidden shadow-lg rounded-xl">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">Today's Schedules</h3>
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Today's Schedules</h3>
+                    <p class="text-xs text-gray-500 mt-1">Showing first 5 schedules</p>
+                </div>
+                <a href="{{ route('operator.schedules.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
             </div>
             <div class="p-6">
                 @if($todaySchedules->count() > 0)

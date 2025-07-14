@@ -34,7 +34,11 @@ class User extends Authenticatable
         'company_name',
         'company_address',
         'company_license',
+        'company_phone',
+        'company_email',
+        'license_number',
         'contact_person',
+        'settings',
     ];
 
     /**
@@ -61,6 +65,7 @@ class User extends Authenticatable
             'date_of_birth' => 'date',
             'last_login_at' => 'datetime',
             'password_changed_at' => 'datetime',
+            'settings' => 'array',
         ];
     }
 

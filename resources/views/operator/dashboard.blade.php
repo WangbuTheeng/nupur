@@ -168,14 +168,16 @@
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <!-- Recent Bookings -->
         <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="px-6 py-5 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Recent Bookings</h3>
+            <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Recent Bookings</h3>
+                    <p class="text-xs text-gray-500 mt-1">Showing latest 5 bookings</p>
+                </div>
+                <a href="{{ route('operator.bookings.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
             </div>
             <div class="p-6">
-                @php
-                    $recentBookings = Auth::user()->operatorBookings()->with(['user', 'schedule.route'])->orderBy('created_at', 'desc')->limit(5)->get();
-                @endphp
-                
                 @if($recentBookings->count() > 0)
                     <div class="space-y-4">
                         @foreach($recentBookings as $booking)
@@ -213,14 +215,16 @@
 
         <!-- Today's Schedules -->
         <div class="bg-white overflow-hidden shadow-lg rounded-xl border border-gray-100">
-            <div class="px-6 py-5 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Today's Schedules</h3>
+            <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Today's Schedules</h3>
+                    <p class="text-xs text-gray-500 mt-1">Showing first 5 schedules</p>
+                </div>
+                <a href="{{ route('operator.schedules.index') }}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
             </div>
             <div class="p-6">
-                @php
-                    $todaySchedules = Auth::user()->schedules()->with(['route', 'bus'])->where('travel_date', today())->orderBy('departure_time')->get();
-                @endphp
-                
                 @if($todaySchedules->count() > 0)
                     <div class="space-y-4">
                         @foreach($todaySchedules as $schedule)

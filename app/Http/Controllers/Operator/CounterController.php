@@ -19,19 +19,20 @@ class CounterController extends Controller
      */
     public function index()
     {
-        // Get today's schedules for this operator
+        // Get today's schedules for this operator (only show non-finished schedules)
         $todaySchedules = Auth::user()->schedules()
             ->with(['route', 'bus'])
             ->whereDate('travel_date', Carbon::today())
+            ->notFinished() // Only show schedules that haven't departed yet
             ->orderBy('departure_time')
             ->get();
 
-        // Get recent counter bookings
+        // Get recent counter bookings (top 5)
         $recentBookings = Auth::user()->operatorBookings()
             ->with(['user', 'schedule.route'])
             ->where('bookings.booking_type', 'counter')
             ->orderBy('bookings.created_at', 'desc')
-            ->limit(10)
+            ->limit(5)
             ->get();
 
         // Statistics

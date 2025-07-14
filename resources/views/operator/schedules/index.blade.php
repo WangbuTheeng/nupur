@@ -210,10 +210,27 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
-                                            {{ ($schedule->status ?? 'scheduled') === 'scheduled' ? 'bg-blue-100 text-blue-800' : (($schedule->status ?? '') === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
-                                            {{ ucfirst($schedule->status ?? 'scheduled') }}
-                                        </span>
+                                        @if($schedule->hasFinished())
+                                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                Departed
+                                            </span>
+                                        @elseif($schedule->status === 'completed')
+                                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                                Completed
+                                            </span>
+                                        @elseif($schedule->status === 'cancelled')
+                                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                                Cancelled
+                                            </span>
+                                        @elseif($schedule->status === 'scheduled')
+                                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                Scheduled
+                                            </span>
+                                        @else
+                                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                {{ ucfirst($schedule->status ?? 'Unknown') }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex space-x-2">

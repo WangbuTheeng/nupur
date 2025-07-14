@@ -14,6 +14,16 @@ Route::get('/demo/seat-layouts', function () {
     return view('demo.seat-layouts');
 })->name('demo.seat-layouts');
 
+// Demo route for customer dashboard
+Route::get('/demo/customer-dashboard', function () {
+    return view('demo.customer-dashboard');
+})->name('demo.customer-dashboard');
+
+// Demo route for modern navbar
+Route::get('/demo/modern-navbar', function () {
+    return view('demo.modern-navbar');
+})->name('demo.modern-navbar');
+
 // Debug route to check bus data
 Route::get('/debug/bus-data', function () {
     $bus = App\Models\Bus::first();

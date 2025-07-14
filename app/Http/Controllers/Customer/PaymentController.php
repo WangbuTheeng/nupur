@@ -315,4 +315,19 @@ class PaymentController extends Controller
 
         return response()->json(['status' => 'success']);
     }
+
+    /**
+     * Display payment history for the authenticated user.
+     */
+    public function history()
+    {
+        // Get payments from bookings
+        $payments = Auth::user()->bookings()
+            ->with(['schedule.route', 'schedule.bus'])
+            ->where('status', 'confirmed')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return view('customer.payments.history', compact('payments'));
+    }
 }

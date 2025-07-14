@@ -59,6 +59,16 @@ class BookingController extends Controller
      */
     public function seatSelection(Schedule $schedule)
     {
+        // Check if schedule has finished
+        if ($schedule->hasFinished()) {
+            return back()->with('error', 'This schedule has already departed and is no longer available for booking.');
+        }
+
+        // Check if schedule is bookable online
+        if (!$schedule->isBookableOnline()) {
+            return back()->with('error', 'Online booking is no longer available for this schedule. Please contact the operator for counter booking.');
+        }
+
         if ($schedule->available_seats <= 0) {
             return back()->with('error', 'No seats available for this schedule.');
         }
@@ -177,6 +187,16 @@ class BookingController extends Controller
         ]);
 
         $schedule = Schedule::findOrFail($request->schedule_id);
+
+        // Check if schedule has finished
+        if ($schedule->hasFinished()) {
+            return back()->with('error', 'This schedule has already departed and is no longer available for booking.');
+        }
+
+        // Check if schedule is still bookable online
+        if (!$schedule->isBookableOnline()) {
+            return back()->with('error', 'Online booking is no longer available for this schedule.');
+        }
 
         // Check seat reservation
         $reservationKey = 'seat_reservation_' . $schedule->id . '_' . Auth::id();
@@ -379,4 +399,7 @@ class BookingController extends Controller
 
         return $seatLayout;
     }
+
+
+
 }

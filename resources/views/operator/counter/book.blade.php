@@ -89,6 +89,41 @@
         </div>
     </div>
 
+    <!-- Schedule Status Warning -->
+    @if($schedule->hasFinished())
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-red-400"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">
+                        Schedule Has Departed
+                    </h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p>This bus has already departed at {{ $schedule->departure_time }} on {{ $schedule->travel_date->format('M j, Y') }}. You can view the seat layout but cannot make new bookings.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @elseif(!$schedule->isBookableViaCounter())
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-clock text-yellow-400"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">
+                        Booking Not Available
+                    </h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                        <p>Counter booking is not available for this schedule. You can view the seat layout but cannot make new bookings.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('operator.counter.book.store', $schedule) }}" id="bookingForm">
         @csrf
 

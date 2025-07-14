@@ -64,7 +64,10 @@ class BusTypeSeeder extends Seeder
         ];
 
         foreach ($busTypes as $busType) {
-            BusType::create($busType);
+            BusType::updateOrCreate(
+                ['name' => $busType['name']],
+                $busType
+            );
         }
     }
 }
