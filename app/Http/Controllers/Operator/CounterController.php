@@ -122,6 +122,7 @@ class CounterController extends Controller
 
     /**
      * Show booking form for selected schedule.
+     * Allow viewing even after departure time, but prevent booking.
      */
     public function book(Schedule $schedule)
     {
@@ -130,9 +131,8 @@ class CounterController extends Controller
             abort(403, 'Unauthorized access to schedule.');
         }
 
-        if ($schedule->available_seats <= 0) {
-            return back()->with('error', 'No seats available for this schedule.');
-        }
+        // Allow viewing even if no seats available or schedule has departed
+        // The view will handle showing appropriate messages
 
         $schedule->load(['route.sourceCity', 'route.destinationCity', 'bus.busType']);
 
@@ -154,6 +154,8 @@ class CounterController extends Controller
             'bus_total_seats' => $schedule->bus->total_seats,
             'bus_seat_layout_exists' => isset($schedule->bus->seat_layout),
             'bus_seat_layout_keys' => isset($schedule->bus->seat_layout) ? array_keys($schedule->bus->seat_layout) : [],
+            'is_bookable' => $schedule->isBookableViaCounter(),
+            'has_departed' => !$schedule->isBookableViaCounter(),
         ]);
 
         return view('operator.counter.book', compact('schedule', 'seatMap'));
@@ -182,6 +184,9 @@ class CounterController extends Controller
             'request_method' => $request->method(),
             'request_url' => $request->fullUrl(),
             'user_agent' => $request->userAgent(),
+            'has_seat_numbers' => $request->has('seat_numbers'),
+            'seat_numbers_raw' => $request->input('seat_numbers'),
+            'all_inputs' => $request->input(),
         ]);
 
         // Check if seat_numbers is present and log it
@@ -192,7 +197,14 @@ class CounterController extends Controller
                 'seat_numbers_count' => is_array($request->seat_numbers) ? count($request->seat_numbers) : 0,
             ]);
         } else {
-            \Log::error('No seat_numbers in request!');
+            \Log::error('No seat_numbers in request!', [
+                'all_request_keys' => array_keys($request->all()),
+                'request_input_method' => $request->input('seat_numbers'),
+            ]);
+
+            // Return with error immediately if no seat numbers
+            return back()->withInput()
+                ->with('error', 'No seats selected. Please select at least one seat before booking.');
         }
 
         try {
@@ -432,10 +444,15 @@ class CounterController extends Controller
                 $seatNumber = $seat['number'] ?? $seat['seat_number'] ?? null;
                 if ($seatNumber) {
                     $seatNumberStr = (string)$seatNumber;
-                    $seat['is_booked'] = in_array($seatNumberStr, $bookedSeats);
-                    $seat['is_available'] = !$seat['is_booked'];
+                    $isBooked = in_array($seatNumberStr, $bookedSeats);
+
+                    $seat['is_booked'] = $isBooked;
+                    $seat['is_available'] = !$isBooked;
                     $seat['number'] = $seatNumberStr; // Normalize the key
                     $seat['seat_number'] = $seatNumberStr; // Keep both for compatibility
+
+                    // Set status for frontend
+                    $seat['status'] = $isBooked ? 'booked' : 'available';
 
                     // Ensure row and column are set
                     if (!isset($seat['row']) || !isset($seat['column'])) {

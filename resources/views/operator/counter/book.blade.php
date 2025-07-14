@@ -2,8 +2,38 @@
 
 @section('title', 'Counter Booking - ' . $schedule->route->sourceCity->name . ' to ' . $schedule->route->destinationCity->name)
 
+@push('head')
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+@endpush
+
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Error Messages -->
+    @if ($errors->any())
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <strong>Validation Errors:</strong>
+            <ul class="mt-2">
+                @foreach ($errors->all() as $error)
+                    <li>• {{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    @if (session('success'))
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            {{ session('success') }}
+        </div>
+    @endif
+
     <!-- Header -->
     <div class="bg-gradient-to-r from-purple-600 to-purple-800 overflow-hidden shadow-xl rounded-xl mb-8">
         <div class="px-6 py-8">
@@ -61,9 +91,11 @@
 
     <form method="POST" action="{{ route('operator.counter.book.store', $schedule) }}" id="bookingForm">
         @csrf
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Seat Selection -->
-            <div class="bg-white overflow-hidden shadow-lg rounded-xl">
+
+        <!-- TWO COLUMN LAYOUT: Left = Seats, Right = Passenger Details -->
+        <div class="booking-container" style="display: flex; flex-direction: row; gap: 2rem; width: 100%; align-items: flex-start;">
+            <!-- LEFT COLUMN: Seat Selection -->
+            <div class="seat-selection-column" style="flex: 1; width: 50%; background: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); overflow: hidden; min-height: 600px;">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900">Select Seats</h3>
                     <p class="text-sm text-gray-500">Click on available seats to select them</p>
@@ -96,47 +128,131 @@
                                 <br><strong>Seat Map Keys:</strong> {{ implode(', ', array_keys($seatMap ?? [])) }}
                                 <br><strong>First Seat:</strong> {{ json_encode($seatMap['seats'][0] ?? 'None') }}
                                 <button onclick="console.log('Seat Data:', @json($seatMap))" class="ml-2 px-2 py-1 bg-blue-500 text-white rounded text-xs">Log Data</button>
-                                <button onclick="forceRenderLayout()" class="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs">Force Render</button>
-                                <button onclick="debugSeatRendering()" class="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs">Debug Seats</button>
+                                <button onclick="window.handleSeatClickDirect('1', document.querySelector('[data-seat=\'1\']'))" class="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs">Test Seat 1</button>
+                                <button onclick="location.reload(true)" class="ml-2 px-2 py-1 bg-purple-500 text-white rounded text-xs">Hard Refresh</button>
                             </div>
                         @endif
 
                         <div id="counterSeatLayoutDisplay" class="min-h-[400px]">
-                            <!-- Bus Frame Layout matching operator bus design -->
-                            <div class="seat-map-container">
-                                <div class="bus-layout-container">
-                                    <div class="bus-frame">
-                                        <div class="bus-top-section">
-                                            <div class="bus-door" title="Front Door">🚪</div>
-                                            <div class="bus-front-space"></div>
-                                            <div class="driver-seat" title="Driver">👨‍✈️</div>
-                                        </div>
-                                        <div class="main-seating-area">
+                            <!-- IMMEDIATE SEAT RENDERING -->
+                            <div class="seat-map-container bg-gray-100 p-6 rounded-lg">
+                                <!-- Bus Header -->
+                                <div class="flex justify-between items-center mb-4 p-3 bg-gray-600 text-white rounded">
+                                    <div class="text-sm">🚪 Door</div>
+                                    <div class="text-sm">👨‍✈️ Driver</div>
+                                </div>
 
-                                            <!-- Seats will be rendered by JavaScript -->
+                                <!-- Seat Grid -->
+                                <div class="bus-seats-grid">
+                                    @php
+                                        $seats = $seatMap['seats'] ?? [];
+                                        $seatsByRow = [];
+
+                                        // Group seats by row
+                                        foreach ($seats as $seat) {
+                                            $row = $seat['row'] ?? ceil(intval($seat['seat_number']) / 4);
+                                            if (!isset($seatsByRow[$row])) {
+                                                $seatsByRow[$row] = [];
+                                            }
+                                            $seatsByRow[$row][] = $seat;
+                                        }
+
+                                        // Sort rows
+                                        ksort($seatsByRow);
+                                    @endphp
+
+                                    @foreach($seatsByRow as $rowNum => $rowSeats)
+                                        <div class="seat-row flex justify-center gap-2 mb-3" data-row="{{ $rowNum }}">
+                                            @php
+                                                // Sort seats in row by seat number
+                                                usort($rowSeats, function($a, $b) {
+                                                    return intval($a['seat_number']) - intval($b['seat_number']);
+                                                });
+                                            @endphp
+
+                                            @foreach($rowSeats as $index => $seat)
+                                                @php
+                                                    $seatNumber = $seat['seat_number'];
+                                                    $status = $seat['status'] ?? 'available';
+
+                                                    switch ($status) {
+                                                        case 'booked':
+                                                            $bgColor = 'bg-red-500';
+                                                            $textColor = 'text-white';
+                                                            $cursor = 'cursor-not-allowed';
+                                                            $disabled = 'disabled';
+                                                            break;
+                                                        case 'reserved':
+                                                            $bgColor = 'bg-blue-500';
+                                                            $textColor = 'text-white';
+                                                            $cursor = 'cursor-not-allowed';
+                                                            $disabled = 'disabled';
+                                                            break;
+                                                        default:
+                                                            $bgColor = 'bg-green-500 hover:bg-green-600';
+                                                            $textColor = 'text-white';
+                                                            $cursor = 'cursor-pointer';
+                                                            $disabled = '';
+                                                    }
+                                                @endphp
+
+                                                <button type="button"
+                                                        class="seat-button {{ $bgColor }} {{ $textColor }} {{ $cursor }} w-12 h-12 rounded-lg font-medium text-sm transition-all duration-200 border-2 border-transparent hover:border-gray-300"
+                                                        data-seat="{{ $seatNumber }}"
+                                                        data-status="{{ $status }}"
+                                                        {{ $disabled }}
+                                                        title="Seat {{ $seatNumber }} - {{ $status }}">
+                                                    {{ $seatNumber }}
+                                                </button>
+
+                                                @if($index === 1 && count($rowSeats) > 2)
+                                                    <div class="w-6"></div> <!-- Aisle space -->
+                                                @endif
+                                            @endforeach
                                         </div>
-                                        <div class="back-row-label" style="text-align: center; margin-top: 10px; font-size: 12px; color: #6b7280; border-top: 1px solid #d1d5db; padding-top: 8px;">
-                                            BACK ROW
-                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <!-- Legend -->
+                                <div class="flex justify-center gap-4 mt-6 text-sm">
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                                        <span>Available</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+                                        <span>Selected</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                                        <span>Booked</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                                        <span>Reserved</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        </div>
                     </div>
 
                     <!-- Selected Seats Display -->
-                    <div class="mt-6">
-                        <div class="text-sm font-medium text-gray-700 mb-2">Selected Seats:</div>
-                        <div id="selectedSeats" class="text-lg font-semibold text-blue-600">None</div>
-                        <div class="text-sm text-gray-500 mt-1">
-                            Total Amount: <span id="totalAmount" class="font-medium">Rs. 0.00</span>
+                    <div class="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Selected Seats:</span>
+                            <span id="selectedSeats" class="text-lg font-semibold text-blue-600">None</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                            <span class="text-sm font-medium text-gray-700">Total Amount:</span>
+                            <span id="totalAmount" class="text-lg font-bold text-purple-600">Rs. 0.00</span>
                         </div>
                     </div>
                 </div>
-            </div>
+            
 
-            <!-- Passenger Details -->
-            <div class="bg-white overflow-hidden shadow-lg rounded-xl">
+            <!-- RIGHT COLUMN: Passenger Details -->
+            <div class="passenger-details-column" style="flex: 1; width: 50%; background: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); overflow: hidden; min-height: 600px;">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900">Passenger Details</h3>
                 </div>
@@ -268,13 +384,30 @@
 
                     <!-- Submit Button -->
                     <div class="border-t border-gray-200 pt-6">
-                        <button type="submit" id="submitBtn" disabled
+                        <button type="submit" id="submitBtn"
                                 class="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200">
                             <i class="fas fa-ticket-alt mr-2"></i>
                             Create Booking
                         </button>
+
+                        <!-- Debug: Manual seat input fallback -->
+                        <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg" id="debugSection" style="display: block;">
+                            <p class="text-sm text-yellow-800 mb-2">Debug: Test seat selection or manually enter seat numbers:</p>
+                            <div class="flex gap-2 mb-2">
+                                <button type="button" onclick="testSeatSelection()" class="px-3 py-1 bg-blue-500 text-white text-sm rounded">Test Seat Click</button>
+                                <button type="button" onclick="showSelectedSeats()" class="px-3 py-1 bg-green-500 text-white text-sm rounded">Show Selected</button>
+                                <button type="button" onclick="clearSelectedSeats()" class="px-3 py-1 bg-red-500 text-white text-sm rounded">Clear All</button>
+                                <button type="button" onclick="testDirectSeatClick()" class="px-3 py-1 bg-orange-500 text-white text-sm rounded">Direct Test</button>
+                                <button type="button" onclick="testFormSubmission()" class="px-3 py-1 bg-purple-500 text-white text-sm rounded">Test Submit</button>
+                            </div>
+                            <input type="text" id="manualSeats" placeholder="e.g., 1,2,3" class="w-full px-3 py-2 border border-yellow-300 rounded-md text-sm">
+                            <button type="button" onclick="applyManualSeats()" class="mt-2 px-3 py-1 bg-yellow-500 text-white text-sm rounded">Apply Seats</button>
+                        </div>
                     </div>
+             
                 </div>
+               </div>
+
             </div>
         </div>
 
@@ -285,35 +418,94 @@
 
 @push('styles')
 <style>
-/* Bus Frame Layout Styles - matching operator bus design */
-.bus-frame {
-    background: #f0f4f8;
-    border: 2px solid #a0aec0;
-    border-radius: 20px;
+/* OPERATOR BUS DESIGN: Exact same styling as operator bus pages */
+.seat-map-container {
+    max-width: 700px;
+    margin: 0 auto;
     padding: 20px;
-    max-width: 400px;
-    margin: auto;
+    background: #f8fafc;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.bus-layout-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+.bus-frame {
+    background: linear-gradient(to bottom, #f8fafc, #e2e8f0);
+    border: 3px solid #475569;
+    border-radius: 25px;
+    padding: 15px;
+    position: relative;
+    min-height: 300px;
 }
 
 .bus-top-section {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.bus-door, .driver-seat {
-    padding: 10px;
-    border-radius: 5px;
-    font-weight: bold;
-    color: white;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 8px 15px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 15px;
+    border: 2px solid #cbd5e1;
 }
 
 .bus-door {
-    background-color: #4299e1;
+    background: #3b82f6;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .driver-seat {
-    background-color: #48bb78;
+    background: #10b981;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.main-seating-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.seat-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.aisle-space {
+    width: 20px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 18px;
+}
+
+.back-row-container {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    background: rgba(139, 92, 246, 0.1);
+    padding: 8px;
+    border-radius: 12px;
+    border: 2px dashed #8b5cf6;
 }
 
 .main-seating-area {
@@ -326,30 +518,38 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
+    gap: 0px;
+    margin-bottom: 10px;
+    padding: 2px 0;
 }
 
 .aisle-space {
-    width: 20px;
+    width: 32px;
+    min-height: 45px;
+    margin: 4px;
+    padding: 8px 0;
+    box-sizing: border-box;
 }
 
-/* Force seat button styles to override any conflicts */
-.seat-button, button.seat-button {
-    width: 50px !important;
-    height: 40px !important;
-    border-radius: 5px !important;
+/* OPERATOR BUS DESIGN: Exact seat styling */
+.seat, .seat-button, button.seat-button {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-weight: bold !important;
-    font-size: 12px !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    border: none !important;
+    border: 2px solid transparent !important;
     color: white !important;
     text-decoration: none !important;
     outline: none !important;
-    margin: 2px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    position: relative !important;
+    user-select: none !important;
 }
 
 /* Seat state styling - matching operator bus design */
@@ -365,15 +565,15 @@
     background-color: #a78bfa;
 }
 
-/* Available seat styling - Green color */
-.seat-button.available {
-    background: #68d391 !important; /* Green for available */
+/* OPERATOR BUS DESIGN: Available seats */
+.seat.available, .seat-button.available {
+    background: #22c55e !important;
     color: white !important;
 }
 
-.seat-button.available:hover {
-    background: #48bb78 !important;
-    transform: translateY(-1px) !important;
+.seat.available:hover, .seat-button.available:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Window seat styling */
@@ -386,21 +586,27 @@
     background: #a78bfa !important;
 }
 
-/* Selected/Reserved seat styling - Blue color - HIGHEST PRIORITY */
-.seat-button.selected,
-.seat-button.reserved {
+/* OPERATOR BUS DESIGN: Selected seats */
+.seat.selected, .seat-button.selected {
+    background: #eab308 !important;
+    color: white !important;
+    border-color: #ca8a04 !important;
+    animation: pulse 1.5s infinite !important;
+}
+
+.seat.selected:hover, .seat-button.selected:hover {
+    background: #ca8a04 !important;
+    border-color: #a16207 !important;
+}
+
+/* OPERATOR BUS DESIGN: Reserved seats (for counter booking) */
+.seat.reserved, .seat-button.reserved {
     background: #3b82f6 !important; /* Blue for reserved/selected */
     color: white !important;
     border-color: #1d4ed8 !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
     z-index: 2 !important;
-}
-
-.seat-button.selected:hover,
-.seat-button.reserved:hover {
-    background: #2563eb !important;
-    border-color: #1e40af !important;
 }
 
 /* Force blue color for selected seats - override any other styles */
@@ -417,26 +623,155 @@ button.seat-button.selected {
     100% { transform: scale(1) translateY(-1px); }
 }
 
-/* Window seat border enhancement */
-.seat-button.window-seat:not(.selected):not(.booked):not(.reserved) {
-    border-color: #0ea5e9 !important;
+/* OPERATOR BUS DESIGN: Window seats */
+.seat.window-seat, .seat-button.window-seat {
+    background: #3b82f6 !important;
+    color: white !important;
 }
 
-/* Booked/Paid seats - Red color */
-.seat-button.booked,
-.seat-button[disabled] {
-    background: #ef4444 !important; /* Red for booked/paid */
+/* OPERATOR BUS DESIGN: Back row seats */
+.seat.back-row-seat, .seat-button.back-row-seat {
+    background: #8b5cf6 !important;
+    color: white !important;
+    width: 35px !important;
+    height: 35px !important;
+    font-size: 10px !important;
+    margin: 0 1px !important;
+}
+
+/* OPERATOR BUS DESIGN: Booked seats */
+.seat.booked, .seat-button.booked,
+.seat[disabled], .seat-button[disabled] {
+    background: #ef4444 !important;
     color: white !important;
     cursor: not-allowed !important;
     opacity: 0.9 !important;
     border-color: #dc2626 !important;
 }
 
-.seat-button.booked:hover,
-.seat-button[disabled]:hover {
+.seat.booked:hover, .seat-button.booked:hover,
+.seat[disabled]:hover, .seat-button[disabled]:hover {
     background: #ef4444 !important;
     transform: none !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* OPERATOR BUS DESIGN: Pulse animation for selected seats */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* FIXED: SIDE-BY-SIDE LAYOUT */
+.booking-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+/* Desktop: Force side-by-side layout */
+@media (min-width: 1200px) {
+    .booking-container {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 2rem !important;
+        align-items: flex-start !important;
+        width: 100% !important;
+    }
+
+    .seat-selection-column {
+        flex: 1 !important;
+        width: 50% !important;
+        max-width: 50% !important;
+    }
+
+    .passenger-details-column {
+        flex: 1 !important;
+        width: 50% !important;
+        max-width: 50% !important;
+    }
+}
+
+/* Column styling */
+.seat-selection-column,
+.passenger-details-column {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    width: 100%;
+    min-height: 600px;
+}
+
+/* Ensure seat map fits properly */
+.seat-selection-column .seat-map-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 15px !important;
+}
+
+/* Force visibility and proper sizing */
+.passenger-details-column {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 1199px) {
+    .booking-container {
+        flex-direction: column !important;
+    }
+
+    .seat-selection-column,
+    .passenger-details-column {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+    }
+}
+
+/* Force inline styles override */
+.booking-container[style] {
+    display: flex !important;
+}
+
+@media (min-width: 1200px) {
+    .booking-container[style] {
+        flex-direction: row !important;
+    }
+
+    .seat-selection-column[style],
+    .passenger-details-column[style] {
+        width: 50% !important;
+        flex: 1 !important;
+    }
+}
+
+/* Additional styling for headers and content */
+.seat-selection-column .px-6,
+.passenger-details-column .px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.seat-selection-column .py-4,
+.passenger-details-column .py-4 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.seat-selection-column .p-6,
+.passenger-details-column .p-6 {
+    padding: 1.5rem;
+}
+
+/* Ensure proper border styling */
+.seat-selection-column .border-b,
+.passenger-details-column .border-b {
+    border-bottom-width: 1px;
+    border-color: #e5e7eb;
 }
 
 /* Force override any conflicting styles for booked seats */
@@ -452,321 +787,178 @@ button.seat-button.selected {
 
 @push('scripts')
 <script>
-// Simple, guaranteed-to-work seat selection system
-let selectedSeats = [];
-const farePerSeat = {{ $schedule->fare }};
+console.log('🚀 JavaScript loading...');
 
-// Render seat layout in bus frame - matching operator bus design
-function renderCounterSeatLayout(seatData, containerId) {
-    console.log('🚌 Rendering counter seat layout for:', containerId);
-    console.log('📊 Seat data:', seatData);
+// SIMPLIFIED SEAT SELECTION SYSTEM - GLOBAL SCOPE
+window.selectedSeats = [];
+window.farePerSeat = {{ $schedule->fare }};
+window.isBookingAllowed = {{ $schedule->isBookableViaCounter() ? 'true' : 'false' }};
 
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error('❌ Container not found:', containerId);
-        return;
-    }
+console.log('📊 Initial setup:', {
+    farePerSeat: window.farePerSeat,
+    isBookingAllowed: window.isBookingAllowed,
+    selectedSeats: window.selectedSeats
+});
 
-    const { seats, has_back_row, layout_type, aisle_position } = seatData;
 
-    // Find the main seating area within the bus frame
-    const mainSeatingArea = container.querySelector('.main-seating-area');
-    if (!mainSeatingArea) {
-        console.error('❌ Main seating area not found');
-        return;
-    }
-
-    let html = '';
-
-    const seatsByRow = {};
-    if (seats) {
-        seats.forEach(seat => {
-            if (!seatsByRow[seat.row]) {
-                seatsByRow[seat.row] = [];
-            }
-            seatsByRow[seat.row].push(seat);
-        });
-    }
-
-    const maxRow = Object.keys(seatsByRow).length > 0 ? Math.max(...Object.keys(seatsByRow).map(r => parseInt(r, 10))) : 0;
-
-    for (let r = 1; r <= maxRow; r++) {
-        const rowSeats = seatsByRow[r] || [];
-        const isBackRow = has_back_row && r === maxRow;
-
-        html += `<div class="seat-row ${isBackRow ? 'back-row' : 'regular-row'}" data-row="${r}">`;
-
-        if (isBackRow) {
-            html += '<div class="back-row-container" style="display: flex; gap: 5px; justify-content: center;">';
-            rowSeats.sort((a,b) => a.column - b.column).forEach(seat => {
-                const seatClasses = `seat-button available back-row-seat ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
-                const isBooked = seat.is_booked || false;
-                html += `<button type="button"
-                    class="${seatClasses}"
-                    data-seat="${seat.number}"
-                    data-booked="${isBooked}"
-                    data-window="${seat.is_window || false}"
-                    ${isBooked ? 'disabled' : ''}
-                    onclick="toggleSeatSelection(this, '${seat.number}')"
-                    title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''} - Back Row"
-                    style="width: 35px; height: 35px;">${seat.number}</button>`;
-            });
-            html += '</div>';
-        } else {
-            // Use the fixed column-based rendering
-            const seatsByColumn = {};
-            rowSeats.forEach(seat => {
-                seatsByColumn[seat.column] = seat;
-            });
-
-            const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
-
-            for (let col = 1; col <= maxColumns; col++) {
-                if (seatsByColumn[col]) {
-                    const seat = seatsByColumn[col];
-                    const seatClasses = `seat-button available ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
-                    const isBooked = seat.is_booked || false;
-                    html += `<button type="button"
-                        class="${seatClasses}"
-                        data-seat="${seat.number}"
-                        data-booked="${isBooked}"
-                        data-window="${seat.is_window || false}"
-                        ${isBooked ? 'disabled' : ''}
-                        onclick="toggleSeatSelection(this, '${seat.number}')"
-                        title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''}">${seat.number}</button>`;
-                } else {
-                    html += '<div class="aisle-space"></div>';
-                }
-            }
-        }
-
-        html += `</div>`;
-    }
-
-    mainSeatingArea.innerHTML = html;
-    console.log('✅ Counter seat layout rendered successfully');
-}
-
-// Force render layout function for debug button
-function forceRenderLayout() {
-    console.log('🔄 Force rendering layout...');
-    const seatData = @json($seatMap);
-    renderCounterSeatLayout(seatData, 'counterSeatLayoutDisplay');
-
-    // Re-initialize seat colors after rendering
-    setTimeout(() => {
-        initializeSeatColors();
-    }, 100);
-}
-
-// Debug function to check seat rendering
-function debugSeatRendering() {
-    console.log('🔍 Debugging seat rendering...');
-
-    const seatButtons = document.querySelectorAll('.seat-button');
-    const seatContainer = document.getElementById('counterSeatLayoutDisplay');
-
-    console.log('Seat container:', seatContainer);
-    console.log('Seat buttons found:', seatButtons.length);
-
-    if (seatButtons.length === 0) {
-        console.log('❌ No seat buttons found! Checking HTML structure...');
-        console.log('Container HTML:', seatContainer ? seatContainer.innerHTML : 'Container not found');
-    } else {
-        console.log('✅ Seat buttons found:', Array.from(seatButtons).map(btn => ({
-            text: btn.textContent,
-            classes: btn.className,
-            dataset: btn.dataset,
-            disabled: btn.disabled
-        })));
-    }
-
-    // Check if seats are being rendered as text instead of buttons
-    const allSeats = seatContainer ? seatContainer.querySelectorAll('*') : [];
-    console.log('All elements in seat container:', Array.from(allSeats).map(el => ({
-        tag: el.tagName,
-        text: el.textContent.trim(),
-        classes: el.className
-    })));
-}
-
-// Initialize seat colors based on their current state
-function initializeSeatColors() {
-    const seatButtons = document.querySelectorAll('.seat-button');
-    console.log('🎨 Initializing seat colors for', seatButtons.length, 'seats');
-
-    seatButtons.forEach(button => {
-        const isBooked = button.dataset.booked === 'true' || button.disabled;
-        const isSelected = selectedSeats.includes(button.dataset.seat);
-
-        // Remove all state classes first
-        button.classList.remove('available', 'selected', 'booked', 'reserved');
-
-        if (isBooked) {
-            button.classList.add('booked');
-            button.style.background = '#ef4444'; // Red for booked
-            button.style.borderColor = '#dc2626';
-            button.style.cursor = 'not-allowed';
-            console.log('🔴 Seat', button.dataset.seat, 'marked as booked');
-        } else if (isSelected) {
-            button.classList.add('selected');
-            button.style.background = '#3b82f6'; // Blue for selected
-            button.style.borderColor = '#1d4ed8';
-            button.style.cursor = 'pointer';
-            console.log('🔵 Seat', button.dataset.seat, 'marked as selected');
-        } else {
-            button.classList.add('available');
-            button.style.background = '#22c55e'; // Green for available
-            button.style.borderColor = '#16a34a';
-            button.style.cursor = 'pointer';
-            console.log('🟢 Seat', button.dataset.seat, 'marked as available');
-        }
-    });
-}
-
-// Toggle seat selection - called directly from PHP-rendered buttons
-function toggleSeatSelection(button, seatNumber) {
-    console.log('🪑 Seat clicked:', seatNumber, 'Button classes:', button.className);
-
-    const isBooked = button.dataset.booked === 'true';
-    if (isBooked || button.disabled) {
-        console.log('❌ Seat is booked/disabled, cannot select');
-        return;
-    }
-
-    const isSelected = button.classList.contains('selected');
-    const isWindow = button.dataset.window === 'true';
-
-    console.log('Current state:', { isSelected, isWindow, classList: button.classList.toString() });
-
-    if (isSelected) {
-        // Deselect seat - return to available state
-        button.classList.remove('selected');
-        button.classList.add('available');
-        button.style.background = '#22c55e'; // Green for available
-        button.style.borderColor = '#16a34a';
-        selectedSeats = selectedSeats.filter(seat => seat !== seatNumber);
-        console.log('❌ Deselected seat:', seatNumber, 'New classes:', button.className);
-    } else {
-        // Select seat - make it selected
-        button.classList.remove('available');
-        button.classList.add('selected');
-        button.style.background = '#3b82f6'; // Blue for selected
-        button.style.borderColor = '#1d4ed8';
-        selectedSeats.push(seatNumber);
-        console.log('✅ Selected seat:', seatNumber, 'New classes:', button.className);
-    }
-
-    console.log('Selected seats array:', selectedSeats);
-    updateSelectedSeatsDisplay();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Counter booking setup complete - rendering bus layout');
-
-    // Render the seat layout using JavaScript
-    const seatData = @json($seatMap);
-    console.log('📊 Seat map data:', seatData);
-
-    if (seatData && seatData.seats) {
-        renderCounterSeatLayout(seatData, 'counterSeatLayoutDisplay');
-    } else {
-        console.error('❌ No seat data available');
-    }
-
-    // Debug: Check authentication and CSRF
-    const csrfToken = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
-    console.log('🔐 Auth & Security check:', {
-        csrfTokenExists: !!csrfToken,
-        csrfTokenValue: csrfToken ? csrfToken.content || csrfToken.value : null,
-        currentUrl: window.location.href,
-        userAgent: navigator.userAgent
-    });
-
-    // Get display elements
+// GLOBAL UPDATE DISPLAY FUNCTION - Available immediately
+window.updateSelectedSeatsDisplay = function() {
     const selectedSeatsDisplay = document.getElementById('selectedSeats');
     const totalAmountDisplay = document.getElementById('totalAmount');
     const seatNumbersContainer = document.getElementById('seatNumbersContainer');
     const submitBtn = document.getElementById('submitBtn');
 
-    console.log('📋 Found elements:', {
-        selectedSeatsDisplay: !!selectedSeatsDisplay,
-        totalAmountDisplay: !!totalAmountDisplay,
-        seatNumbersContainer: !!seatNumbersContainer,
-        submitBtn: !!submitBtn
-    });
+    console.log('🔄 Updating display, selected seats:', window.selectedSeats);
 
-    // Debug: Check all seat buttons
-    const seatButtons = document.querySelectorAll('.seat-button');
-    console.log('🪑 Found seat buttons:', seatButtons.length);
-
-    // Initialize seat colors on page load
-    initializeSeatColors();
-
-    // Auto-run debug function
-    setTimeout(() => {
-        debugSeatRendering();
-    }, 1000);
-
-    // Add click event listeners as backup
-    seatButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            console.log('🖱️ Button clicked via event listener:', this.dataset.seat);
+    if (window.selectedSeats.length === 0) {
+        if (selectedSeatsDisplay) selectedSeatsDisplay.textContent = 'None';
+        if (totalAmountDisplay) totalAmountDisplay.textContent = 'Rs. 0.00';
+        if (submitBtn) submitBtn.disabled = !window.isBookingAllowed;
+        if (seatNumbersContainer) seatNumbersContainer.innerHTML = '';
+    } else {
+        // Sort seats numerically
+        window.selectedSeats.sort((a, b) => {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
         });
-    });
 
-    // Initialize display update function
-    window.updateSelectedSeatsDisplay = function() {
-        const selectedSeatsDisplay = document.getElementById('selectedSeats');
-        const totalAmountDisplay = document.getElementById('totalAmount');
-        const seatNumbersContainer = document.getElementById('seatNumbersContainer');
-        const submitBtn = document.getElementById('submitBtn');
+        if (selectedSeatsDisplay) selectedSeatsDisplay.textContent = window.selectedSeats.join(', ');
 
-        console.log('🔄 Updating display, selected seats:', selectedSeats);
+        const totalAmount = window.selectedSeats.length * window.farePerSeat;
+        if (totalAmountDisplay) totalAmountDisplay.textContent = `Rs. ${totalAmount.toFixed(2)}`;
 
-        if (selectedSeats.length === 0) {
-            if (selectedSeatsDisplay) selectedSeatsDisplay.textContent = 'None';
-            if (totalAmountDisplay) totalAmountDisplay.textContent = 'Rs. 0.00';
-            if (submitBtn) submitBtn.disabled = true;
-            if (seatNumbersContainer) seatNumbersContainer.innerHTML = '';
-        } else {
-            selectedSeats.sort((a, b) => {
-                // Sort alphanumerically (A1, A2, B1, B2, etc.)
-                return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        if (submitBtn) submitBtn.disabled = !window.isBookingAllowed;
+
+        // Update seat numbers in the form
+        if (seatNumbersContainer) {
+            seatNumbersContainer.innerHTML = '';
+            window.selectedSeats.forEach(seatNumber => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'seat_numbers[]';
+                input.value = seatNumber;
+                seatNumbersContainer.appendChild(input);
             });
-
-            if (selectedSeatsDisplay) selectedSeatsDisplay.textContent = selectedSeats.join(', ');
-
-            const totalAmount = selectedSeats.length * farePerSeat;
-            if (totalAmountDisplay) totalAmountDisplay.textContent = `Rs. ${totalAmount.toFixed(2)}`;
-
-            if (submitBtn) submitBtn.disabled = false;
-
-            // Update seat numbers in the form
-            if (seatNumbersContainer) {
-                seatNumbersContainer.innerHTML = '';
-                selectedSeats.forEach(seatNumber => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'seat_numbers[]';
-                    input.value = seatNumber;
-                    seatNumbersContainer.appendChild(input);
-                });
-            }
         }
+    }
 
-        // Ensure seat colors are properly applied
-        initializeSeatColors();
+    console.log('✅ Display updated:', {
+        selectedCount: window.selectedSeats.length,
+        totalAmount: window.selectedSeats.length * window.farePerSeat,
+        seats: window.selectedSeats,
+        bookingAllowed: window.isBookingAllowed
+    });
+};
 
-        console.log('✅ Display updated:', {
-            selectedCount: selectedSeats.length,
-            totalAmount: selectedSeats.length * farePerSeat,
-            seats: selectedSeats
+const farePerSeat = window.farePerSeat;
+const isBookingAllowed = window.isBookingAllowed;
+
+// SIMPLE SEAT CLICK HANDLER
+function handleSeatClick(seatNumber, button) {
+    console.log('🖱️ Seat clicked:', seatNumber, 'Button:', button);
+
+    // Check if booking is allowed
+    if (!isBookingAllowed) {
+        alert('Booking is no longer available for this schedule. You can only view the seat layout.');
+        return;
+    }
+
+    // Check if seat is available
+    if (button.disabled || button.dataset.status !== 'available') {
+        console.log('❌ Seat not available:', seatNumber, 'Status:', button.dataset.status, 'Disabled:', button.disabled);
+        return;
+    }
+
+    console.log('🔄 Processing seat selection for:', seatNumber);
+    console.log('📊 Current selected seats before:', window.selectedSeats);
+
+    // Toggle selection
+    if (window.selectedSeats.includes(seatNumber)) {
+        // Deselect
+        window.selectedSeats = window.selectedSeats.filter(s => s !== seatNumber);
+        button.classList.remove('bg-yellow-500');
+        button.classList.add('bg-green-500', 'hover:bg-green-600');
+        console.log('❌ Deselected seat:', seatNumber);
+    } else {
+        // Select
+        window.selectedSeats.push(seatNumber);
+        button.classList.remove('bg-green-500', 'hover:bg-green-600');
+        button.classList.add('bg-yellow-500');
+        console.log('✅ Selected seat:', seatNumber);
+    }
+
+    console.log('📊 Current selected seats after:', window.selectedSeats);
+    window.updateSelectedSeatsDisplay();
+}
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Counter booking setup - SIMPLIFIED VERSION');
+
+    // Setup seat click handlers for ALL seat buttons (not just available ones)
+    const allSeatButtons = document.querySelectorAll('.seat-button');
+    console.log('🔍 Found total seat buttons:', allSeatButtons.length);
+
+    const availableSeats = document.querySelectorAll('.seat-button[data-status="available"]');
+    console.log('🔍 Found available seats:', availableSeats.length);
+
+    // Add click handlers to all seat buttons
+    allSeatButtons.forEach((button, index) => {
+        console.log(`🔧 Setting up seat ${index + 1}:`, {
+            seatNumber: button.dataset.seat,
+            status: button.dataset.status,
+            disabled: button.disabled,
+            classes: button.className
         });
-    };
+
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const seatNumber = this.dataset.seat;
+            console.log('🖱️ Seat button clicked:', seatNumber);
+            handleSeatClick(seatNumber, this);
+        });
+    });
+
+    console.log('✅ Seat click handlers setup complete for', allSeatButtons.length, 'seats');
+
+    // Test if seat clicking works immediately
+    setTimeout(() => {
+        console.log('🧪 Auto-testing seat selection after 2 seconds...');
+        const testSeat = document.querySelector('.seat-button[data-status="available"]');
+        if (testSeat) {
+            console.log('🎯 Found test seat:', testSeat.dataset.seat);
+            console.log('🔧 Test seat classes:', testSeat.className);
+            console.log('🔧 Test seat onclick:', testSeat.onclick);
+        } else {
+            console.log('❌ No available seats found for testing');
+        }
+    }, 2000);
+
+    // Display update function is now global (defined earlier)
 
     // Initialize the display
-    updateSelectedSeatsDisplay();
+    window.updateSelectedSeatsDisplay();
+
+    // Show booking status message
+    if (!isBookingAllowed) {
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-clock mr-2"></i>Booking Closed - Schedule Departed';
+            submitBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+            submitBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+        }
+
+        // Show message in the booking form
+        const bookingForm = document.getElementById('bookingForm');
+        if (bookingForm) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4';
+            messageDiv.innerHTML = '<strong>Notice:</strong> This schedule has departed. You can view the seat layout but cannot create new bookings.';
+            bookingForm.insertBefore(messageDiv, bookingForm.firstChild);
+        }
+    }
 
     // Payment method selection
     const paymentOptions = document.querySelectorAll('input[name="payment_method"]');
@@ -839,24 +1031,48 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedSeatsCount: selectedSeats.length
         });
 
+        // Check seat selection with better error handling
         if (selectedSeats.length === 0) {
             e.preventDefault();
-            alert('Please select at least one seat.');
+            alert('❌ Please select at least one seat before booking.\n\nIf seat selection is not working, use the manual input below.');
             console.log('❌ Form blocked: No seats selected');
+
+            // Show debug section
+            const debugSection = document.getElementById('debugSection');
+            if (debugSection) {
+                debugSection.style.display = 'block';
+            }
             return false;
         }
 
+        // Check payment method
         if (!paymentMethod) {
             e.preventDefault();
-            alert('Please select a payment method.');
+            alert('❌ Please select a payment method (Cash, Card, or Digital).');
             console.log('❌ Form blocked: No payment method selected');
             return false;
         }
 
-        if (!passengerName || !passengerPhone || !passengerAge || !passengerGender || !contactPhone) {
+        // Check required fields with specific messages
+        const missingFields = [];
+        if (!passengerName) missingFields.push('Passenger Name');
+        if (!passengerPhone) missingFields.push('Passenger Phone');
+        if (!passengerAge) missingFields.push('Passenger Age');
+        if (!passengerGender) missingFields.push('Passenger Gender');
+        if (!contactPhone) missingFields.push('Contact Phone');
+
+        if (missingFields.length > 0) {
             e.preventDefault();
-            alert('Please fill in all required fields.');
-            console.log('❌ Form blocked: Missing required fields');
+            alert(`❌ Please fill in the following required fields:\n\n• ${missingFields.join('\n• ')}`);
+            console.log('❌ Form blocked: Missing required fields:', missingFields);
+
+            // Focus on first missing field
+            if (!passengerName) document.getElementById('passenger_name')?.focus();
+            else if (!passengerPhone) document.getElementById('passenger_phone')?.focus();
+            else if (!passengerAge) document.getElementById('passenger_age')?.focus();
+            else if (!passengerGender) document.getElementById('passenger_gender')?.focus();
+            else if (!contactPhone) document.getElementById('contact_phone')?.focus();
+
             return false;
         }
 
@@ -880,11 +1096,25 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Form validation passed, submitting...');
 
         // Debug: Log form action and method
+        const formData = new FormData(form);
         console.log('Form details:', {
             action: form.action,
             method: form.method,
-            formData: new FormData(form)
+            formDataEntries: Array.from(formData.entries())
         });
+
+        // Ensure seat numbers are properly added to form data
+        if (selectedSeats.length > 0) {
+            // Remove any existing seat_numbers entries
+            formData.delete('seat_numbers[]');
+
+            // Add current selected seats
+            selectedSeats.forEach(seatNumber => {
+                formData.append('seat_numbers[]', seatNumber);
+            });
+
+            console.log('✅ Added seat numbers to form data:', selectedSeats);
+        }
 
         // Show loading state
         const submitBtn = document.getElementById('submitBtn');
@@ -897,36 +1127,216 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             if (submitBtn && submitBtn.disabled) {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i>Book Ticket';
+                submitBtn.innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Create Booking';
                 console.log('⚠️ Form submission timeout - button reset');
             }
         }, 10000); // 10 second timeout
 
-        // Alternative: Try fetch-based submission for debugging
-        /*
-        e.preventDefault();
-        const formData = new FormData(form);
+        // This ensures seat numbers are always included even if hidden inputs fail
+        
+        // Remove any existing seat_numbers entries
+        formData.delete('seat_numbers[]');
 
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            }
-        })
-        .then(response => {
-            console.log('Response received:', response.status, response.statusText);
-            return response.text();
-        })
-        .then(data => {
-            console.log('Response data:', data);
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
+        // Add current selected seats
+        selectedSeats.forEach(seatNumber => {
+            formData.append('seat_numbers[]', seatNumber);
         });
-        */
+
+        console.log('🔧 Final form data entries:', Array.from(formData.entries()));
+
+        // Debug mode: Use fetch to see response
+        if (window.location.search.includes('debug=1')) {
+            e.preventDefault();
+            console.log('🔍 DEBUG MODE: Using fetch for form submission');
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => {
+                console.log('Response received:', response.status, response.statusText);
+                return response.text();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.includes('error') || data.includes('Error')) {
+                    alert('Error in response. Check console for details.');
+                } else {
+                    alert('Form submitted successfully! Check console for response.');
+                }
+
+                // Reset button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Create Booking';
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                alert('Network error: ' + error.message);
+
+                // Reset button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Create Booking';
+                }
+            });
+        } else {
+            // Normal form submission - but we need to ensure seat numbers are included
+            // Create a temporary form with the correct data
+            e.preventDefault();
+
+            const tempForm = document.createElement('form');
+            tempForm.method = 'POST';
+            tempForm.action = form.action;
+
+            // Add all form data to temp form
+            for (let [key, value] of formData.entries()) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                tempForm.appendChild(input);
+            }
+
+            document.body.appendChild(tempForm);
+            tempForm.submit();
+        }
     });
 });
+
+// Debug functions for testing
+function testSeatSelection() {
+    console.log('🧪 Testing seat selection...');
+
+    const allSeats = document.querySelectorAll('.seat-button');
+    const availableSeats = document.querySelectorAll('.seat-button[data-status="available"]');
+
+    console.log('📊 Seat analysis:', {
+        totalSeats: allSeats.length,
+        availableSeats: availableSeats.length,
+        selectedSeats: selectedSeats.length
+    });
+
+    if (availableSeats.length === 0) {
+        alert('❌ No available seats found!\n\nTotal seats: ' + allSeats.length);
+        return;
+    }
+
+    const firstAvailableSeat = availableSeats[0];
+    const seatNumber = firstAvailableSeat.dataset.seat;
+
+    console.log('🎯 Testing seat:', seatNumber, 'Element:', firstAvailableSeat);
+
+    // Simulate click
+    firstAvailableSeat.click();
+
+    setTimeout(() => {
+        console.log('📊 After click - Selected seats:', selectedSeats);
+        alert(`✅ Test clicked seat ${seatNumber}\n\nSelected seats: ${selectedSeats.join(', ') || 'None'}\nTotal selected: ${selectedSeats.length}`);
+    }, 100);
+}
+
+function testDirectSeatClick() {
+    console.log('🧪 Testing DIRECT seat click (bypassing event handlers)...');
+
+    const availableSeats = document.querySelectorAll('.seat-button[data-status="available"]');
+    if (availableSeats.length === 0) {
+        alert('❌ No available seats found!');
+        return;
+    }
+
+    const firstSeat = availableSeats[0];
+    const seatNumber = firstSeat.dataset.seat;
+
+    console.log('🎯 Direct testing seat:', seatNumber);
+
+    // Call handleSeatClick directly
+    handleSeatClick(seatNumber, firstSeat);
+
+    alert(`✅ Direct test completed for seat ${seatNumber}\n\nSelected seats: ${selectedSeats.join(', ') || 'None'}`);
+}
+
+function showSelectedSeats() {
+    alert(`Selected seats: ${selectedSeats.join(', ') || 'None'}\nCount: ${selectedSeats.length}`);
+}
+
+function clearSelectedSeats() {
+    selectedSeats = [];
+    const allSeats = document.querySelectorAll('.seat-button[data-status="available"]');
+    allSeats.forEach(seat => {
+        seat.classList.remove('bg-yellow-500');
+        seat.classList.add('bg-green-500', 'hover:bg-green-600');
+    });
+    window.updateSelectedSeatsDisplay();
+    alert('All seats cleared');
+}
+
+// Manual seat selection fallback
+function applyManualSeats() {
+    const manualSeats = document.getElementById('manualSeats').value;
+    if (!manualSeats) return;
+
+    const seatNumbers = manualSeats.split(',').map(s => s.trim()).filter(s => s);
+
+    // Clear existing selection first
+    clearSelectedSeats();
+
+    // Add manual seats
+    selectedSeats = [...seatNumbers];
+
+    // Update visual state
+    seatNumbers.forEach(seatNumber => {
+        const seatButton = document.querySelector(`[data-seat="${seatNumber}"]`);
+        if (seatButton && seatButton.dataset.status === 'available') {
+            seatButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+            seatButton.classList.add('bg-yellow-500');
+        }
+    });
+
+    window.updateSelectedSeatsDisplay();
+    alert(`Selected seats: ${selectedSeats.join(', ')}`);
+}
+
+// Test form submission function
+function testFormSubmission() {
+    console.log('🧪 Testing form submission...');
+
+    // Ensure we have some test data
+    if (selectedSeats.length === 0) {
+        selectedSeats = ['1', '2']; // Add test seats
+        window.updateSelectedSeatsDisplay();
+    }
+
+    // Fill in required fields with test data
+    document.getElementById('passenger_name').value = 'Test Passenger';
+    document.getElementById('passenger_phone').value = '9876543210';
+    document.getElementById('passenger_age').value = '30';
+    document.getElementById('passenger_gender').value = 'male';
+    document.getElementById('contact_phone').value = '9876543210';
+
+    // Select payment method
+    const cashPayment = document.querySelector('input[name="payment_method"][value="cash"]');
+    if (cashPayment) cashPayment.checked = true;
+
+    // Test with debug route
+    const form = document.getElementById('bookingForm');
+    const originalAction = form.action;
+
+    // Change to debug route temporarily
+    form.action = form.action.replace('/book/', '/debug/counter-booking/');
+
+    console.log('🔧 Form action changed to:', form.action);
+    console.log('🔧 Selected seats:', selectedSeats);
+    console.log('🔧 Form data preview:', new FormData(form));
+
+    // Submit form
+    alert('Form will submit to debug route. Check console and logs for results.');
+    form.submit();
+}
 </script>
 @endpush
 @endsection

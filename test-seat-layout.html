@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Seat Layout</title>
+    <style>
+        /* Bus Frame Layout Styles - matching operator bus design */
+        .bus-frame {
+            background: #f0f4f8;
+            border: 3px solid #4a5568;
+            border-radius: 25px;
+            padding: 25px;
+            max-width: 500px;
+            margin: auto;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .bus-top-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            background: #6b7280;
+            border-radius: 15px;
+            padding: 15px 20px;
+            color: white;
+            font-weight: bold;
+        }
+
+        .bus-door, .driver-seat {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+        }
+
+        .bus-door {
+            background-color: #10b981;
+            border: 2px solid #059669;
+        }
+
+        .driver-seat {
+            background-color: #3b82f6;
+            border: 2px solid #1d4ed8;
+        }
+
+        .front-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            flex: 1;
+        }
+
+        .main-seating-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .seat-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .aisle-space {
+            width: 30px;
+            min-height: 45px;
+        }
+
+        /* Force seat button styles to override any conflicts */
+        .seat-button, button.seat-button {
+            width: 60px !important;
+            height: 45px !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            border: 2px solid transparent !important;
+            color: white !important;
+            text-decoration: none !important;
+            outline: none !important;
+            margin: 4px !important;
+            padding: 8px !important;
+            box-sizing: border-box !important;
+            min-width: 60px !important;
+            min-height: 45px !important;
+        }
+
+        /* Available seat styling - Green color */
+        .seat-button.available {
+            background: #10b981 !important; /* Green for available */
+            color: white !important;
+            border-color: #059669 !important;
+        }
+
+        .seat-button.available:hover {
+            background: #059669 !important;
+            border-color: #047857 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3) !important;
+        }
+
+        /* Selected/Reserved seat styling - Blue color - HIGHEST PRIORITY */
+        .seat-button.selected,
+        .seat-button.reserved {
+            background: #3b82f6 !important; /* Blue for reserved/selected */
+            color: white !important;
+            border-color: #1d4ed8 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
+            z-index: 2 !important;
+        }
+
+        .back-row-label {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #6b7280;
+            border-top: 2px solid #d1d5db;
+            padding-top: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .back-row-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 20px;">
+        <h2>Counter Booking Seat Layout Test</h2>
+        
+        <div class="seat-map-container">
+            <div class="bus-layout-container">
+                <div class="bus-frame">
+                    <div class="bus-top-section">
+                        <div class="bus-door" title="Front Door">🚪</div>
+                        <div class="front-label">FRONT</div>
+                        <div class="driver-seat" title="Driver">👨‍✈️</div>
+                    </div>
+                    <div class="main-seating-area" id="seatArea">
+                        <!-- Seats will be rendered by JavaScript -->
+                    </div>
+                    <div class="back-row-label">
+                        BACK ROW
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample seat data for testing
+        const sampleSeatData = {
+            layout_type: '2x2',
+            aisle_position: 3,
+            has_back_row: true,
+            seats: [
+                // Row 1
+                {number: 1, row: 1, column: 1, is_window: true, is_booked: false},
+                {number: 2, row: 1, column: 2, is_window: false, is_booked: false},
+                {number: 3, row: 1, column: 4, is_window: false, is_booked: false},
+                {number: 4, row: 1, column: 5, is_window: true, is_booked: false},
+                // Row 2
+                {number: 5, row: 2, column: 1, is_window: true, is_booked: false},
+                {number: 6, row: 2, column: 2, is_window: false, is_booked: false},
+                {number: 7, row: 2, column: 4, is_window: false, is_booked: false},
+                {number: 8, row: 2, column: 5, is_window: true, is_booked: false},
+                // Row 3
+                {number: 9, row: 3, column: 1, is_window: true, is_booked: false},
+                {number: 10, row: 3, column: 2, is_window: false, is_booked: false},
+                {number: 11, row: 3, column: 4, is_window: false, is_booked: false},
+                {number: 12, row: 3, column: 5, is_window: true, is_booked: false},
+                // Row 4
+                {number: 13, row: 4, column: 1, is_window: true, is_booked: false},
+                {number: 14, row: 4, column: 2, is_window: false, is_booked: false},
+                {number: 15, row: 4, column: 4, is_window: false, is_booked: false},
+                {number: 16, row: 4, column: 5, is_window: true, is_booked: false},
+                // Row 5
+                {number: 17, row: 5, column: 1, is_window: true, is_booked: false},
+                {number: 18, row: 5, column: 2, is_window: false, is_booked: false},
+                {number: 19, row: 5, column: 4, is_window: false, is_booked: false},
+                {number: 20, row: 5, column: 5, is_window: true, is_booked: false},
+                // Back row
+                {number: 21, row: 6, column: 1, is_window: false, is_booked: false},
+                {number: 22, row: 6, column: 2, is_window: false, is_booked: true},
+                {number: 23, row: 6, column: 3, is_window: false, is_booked: true},
+                {number: 24, row: 6, column: 4, is_window: false, is_booked: false},
+                {number: 25, row: 6, column: 5, is_window: false, is_booked: false}
+            ]
+        };
+
+        function renderTestSeatLayout() {
+            const { seats, has_back_row, aisle_position } = sampleSeatData;
+            const seatArea = document.getElementById('seatArea');
+            
+            let html = '';
+            
+            const seatsByRow = {};
+            seats.forEach(seat => {
+                if (!seatsByRow[seat.row]) {
+                    seatsByRow[seat.row] = [];
+                }
+                seatsByRow[seat.row].push(seat);
+            });
+            
+            const maxRow = Math.max(...Object.keys(seatsByRow).map(r => parseInt(r, 10)));
+            
+            for (let r = 1; r <= maxRow; r++) {
+                const rowSeats = seatsByRow[r] || [];
+                const isBackRow = has_back_row && r === maxRow;
+                
+                html += `<div class="seat-row ${isBackRow ? 'back-row' : 'regular-row'}" data-row="${r}">`;
+                
+                if (isBackRow) {
+                    html += renderBackRow(rowSeats);
+                } else {
+                    html += renderRegularRow(rowSeats, aisle_position);
+                }
+                
+                html += `</div>`;
+            }
+            
+            seatArea.innerHTML = html;
+        }
+
+        function renderRegularRow(rowSeats, aislePosition) {
+            let html = '';
+            
+            rowSeats.sort((a, b) => a.column - b.column);
+            
+            const seatsByColumn = {};
+            rowSeats.forEach(seat => {
+                seatsByColumn[seat.column] = seat;
+            });
+            
+            const maxColumns = Math.max(...rowSeats.map(seat => seat.column));
+            
+            for (let col = 1; col <= maxColumns; col++) {
+                if (seatsByColumn[col]) {
+                    const seat = seatsByColumn[col];
+                    const seatClasses = `seat-button available ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
+                    const isBooked = seat.is_booked || false;
+                    
+                    html += `<button type="button"
+                        class="${seatClasses}"
+                        data-seat="${seat.number}"
+                        data-booked="${isBooked}"
+                        ${isBooked ? 'disabled' : ''}
+                        onclick="toggleSeat(this, '${seat.number}')"
+                        title="Seat ${seat.number}${seat.is_window ? ' (Window)' : ''}">${seat.number}</button>`;
+                } else {
+                    html += '<div class="aisle-space"></div>';
+                }
+            }
+            
+            return html;
+        }
+
+        function renderBackRow(rowSeats) {
+            let html = '<div class="back-row-container">';
+            
+            rowSeats.sort((a, b) => a.column - b.column);
+            
+            rowSeats.forEach(seat => {
+                const seatClasses = `seat-button available back-row-seat ${seat.is_window ? 'window-seat' : ''} ${seat.is_booked ? 'booked' : ''}`;
+                const isBooked = seat.is_booked || false;
+                
+                html += `<button type="button"
+                    class="${seatClasses}"
+                    data-seat="${seat.number}"
+                    data-booked="${isBooked}"
+                    ${isBooked ? 'disabled' : ''}
+                    onclick="toggleSeat(this, '${seat.number}')"
+                    title="Seat ${seat.number} - Back Row">${seat.number}</button>`;
+            });
+            
+            html += '</div>';
+            return html;
+        }
+
+        function toggleSeat(button, seatNumber) {
+            const isBooked = button.dataset.booked === 'true';
+            if (isBooked || button.disabled) {
+                return;
+            }
+            
+            const isSelected = button.classList.contains('selected');
+            
+            if (isSelected) {
+                button.classList.remove('selected');
+                button.classList.add('available');
+                button.style.background = '#10b981';
+                button.style.borderColor = '#059669';
+            } else {
+                button.classList.remove('available');
+                button.classList.add('selected');
+                button.style.background = '#3b82f6';
+                button.style.borderColor = '#1d4ed8';
+            }
+        }
+
+        // Render the layout when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            renderTestSeatLayout();
+        });
+    </script>
+</body>
+</html>

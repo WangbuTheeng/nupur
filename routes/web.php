@@ -109,6 +109,25 @@ Route::post('/test/booking-submit', function (Illuminate\Http\Request $request) 
     ]);
 })->name('test.booking.submit');
 
+// Debug route for counter booking
+Route::post('/debug/counter-booking/{schedule}', function (Illuminate\Http\Request $request, App\Models\Schedule $schedule) {
+    \Log::info('Debug counter booking submission', [
+        'request_data' => $request->all(),
+        'schedule_id' => $schedule->id,
+        'has_seat_numbers' => $request->has('seat_numbers'),
+        'seat_numbers' => $request->input('seat_numbers'),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Debug submission received',
+        'data' => $request->all(),
+        'schedule_id' => $schedule->id,
+        'seat_numbers' => $request->input('seat_numbers'),
+        'validation_errors' => [],
+    ]);
+})->middleware(['auth', 'operator'])->name('debug.counter.booking');
+
 // Test page for counter booking
 Route::get('/test/counter-booking-debug', function () {
     return view('test-counter-booking');
