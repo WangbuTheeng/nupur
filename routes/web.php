@@ -150,6 +150,18 @@ Route::get('/test/counter-booking-debug', function () {
     return view('test-counter-booking');
 })->name('test.counter.booking.debug');
 
+// Test customer search and booking flow
+Route::get('/test/customer-search', function () {
+    $cities = \App\Models\City::active()->withActiveRoutes()->orderBy('name')->get()->unique('name');
+    $schedules = \App\Models\Schedule::with(['route.sourceCity', 'route.destinationCity', 'bus.busType', 'operator'])
+        ->bookableOnline()
+        ->where('travel_date', '>=', now()->toDateString())
+        ->limit(10)
+        ->get();
+
+    return view('test-customer-search', compact('cities', 'schedules'));
+})->name('test.customer.search');
+
 // Debug route to check seat data for a specific schedule
 Route::get('/test/seat-data/{schedule}', function (App\Models\Schedule $schedule) {
     $controller = new App\Http\Controllers\Operator\CounterController();

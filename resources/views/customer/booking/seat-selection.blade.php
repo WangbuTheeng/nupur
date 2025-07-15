@@ -455,30 +455,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const farePerSeat = {{ $schedule->fare }};
     let selectedSeats = [];
 
+    console.log('🚌 [SEAT-SELECTION] Page loaded for schedule:', scheduleId);
+    console.log('🚌 [SEAT-SELECTION] Fare per seat:', farePerSeat);
+
     // Handle seat selection for all available seats
     document.querySelectorAll('.seat').forEach(seat => {
         // Only add click handler to available seats
         if (seat.dataset.isAvailable === 'true' && !seat.classList.contains('seat-booked')) {
             seat.addEventListener('click', function() {
                 const seatNumber = this.dataset.seatNumber;
+                console.log('🪑 [SEAT-CLICK] Seat clicked:', seatNumber);
 
                 if (this.classList.contains('seat-selected')) {
                     // Deselect seat
                     this.classList.remove('seat-selected');
                     this.classList.add('seat-available');
                     selectedSeats = selectedSeats.filter(s => s !== seatNumber);
+                    console.log('🪑 [SEAT-DESELECT] Seat deselected:', seatNumber);
                 } else {
                     // Select seat (max 10 seats)
                     if (selectedSeats.length < 10) {
                         this.classList.remove('seat-available');
                         this.classList.add('seat-selected');
                         selectedSeats.push(seatNumber);
+                        console.log('🪑 [SEAT-SELECT] Seat selected:', seatNumber);
                     } else {
                         alert('You can select maximum 10 seats at a time.');
                         return;
                     }
                 }
 
+                console.log('🪑 [SEAT-SELECTION] Current selection:', selectedSeats);
                 updateBookingSummary();
             });
         }
@@ -547,6 +554,7 @@ document.addEventListener('DOMContentLoaded', function() {
         reserveButton.innerHTML = '<svg class="w-5 h-5 inline-block mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Reserving...';
 
         // Reserve seats via AJAX
+        console.log('🔄 [RESERVE-ONLY] Starting seat reservation for:', selectedSeats);
         fetch('{{ route("booking.reserve-seats-only") }}', {
             method: 'POST',
             headers: {
@@ -595,8 +603,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function proceedToPassengerDetails() {
-        if (selectedSeats.length === 0) return;
-        
+        if (selectedSeats.length === 0) {
+            console.log('❌ [PROCEED] No seats selected');
+            return;
+        }
+
+        console.log('🚀 [PROCEED] Proceeding to passenger details with seats:', selectedSeats);
+
         // Reserve seats via AJAX
         fetch('{{ route("booking.reserve-seats") }}', {
             method: 'POST',
@@ -618,8 +631,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred. Please try again.');
+            console.error('Seat reservation error:', error);
+            reserveButton.disabled = false;
+            reserveButton.innerHTML = originalText;
+            alert('An error occurred while reserving seats. Please try again.');
         });
     }
 });

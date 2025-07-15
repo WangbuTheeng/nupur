@@ -62,7 +62,7 @@ class TicketController extends Controller
     }
 
     /**
-     * Download e-ticket as PDF.
+     * Download e-ticket as PDF (Compact Format).
      */
     public function download(Booking $booking)
     {
@@ -82,11 +82,11 @@ class TicketController extends Controller
             'schedule.operator'
         ]);
 
-        // Generate PDF
-        $pdf = Pdf::loadView('customer.tickets.pdf', compact('booking'));
-        $pdf->setPaper('A4', 'portrait');
+        // Generate Compact PDF
+        $pdf = Pdf::loadView('tickets.compact-pdf', compact('booking'));
+        $pdf->setPaper([0, 0, 288, 432], 'portrait'); // 4x6 inches in points for compact size
 
-        $filename = 'BookNGO-Ticket-' . $booking->booking_reference . '.pdf';
+        $filename = 'BookNGO-Compact-Ticket-' . $booking->booking_reference . '.pdf';
 
         return $pdf->download($filename);
     }
@@ -135,25 +135,25 @@ class TicketController extends Controller
                 'schedule.operator'
             ]);
 
-            // Generate PDF
-            $pdf = Pdf::loadView('customer.tickets.pdf', compact('booking'));
-            $pdf->setPaper('A4', 'portrait');
+            // Generate Compact PDF
+            $pdf = Pdf::loadView('tickets.compact-pdf', compact('booking'));
+            $pdf->setPaper([0, 0, 288, 432], 'portrait'); // 4x6 inches in points for compact size
 
-            // Send email with PDF attachment
+            // Send email with compact PDF attachment
             Mail::send('customer.emails.ticket', [
                 'booking' => $booking,
                 'personalMessage' => $request->message,
             ], function ($message) use ($booking, $request, $pdf) {
                 $message->to($request->email)
-                        ->subject('BookNGO E-Ticket - ' . $booking->booking_reference)
+                        ->subject('BookNGO Compact E-Ticket - ' . $booking->booking_reference)
                         ->attachData(
                             $pdf->output(),
-                            'BookNGO-Ticket-' . $booking->booking_reference . '.pdf',
+                            'BookNGO-Compact-Ticket-' . $booking->booking_reference . '.pdf',
                             ['mime' => 'application/pdf']
                         );
             });
 
-            return back()->with('success', 'E-ticket sent successfully to ' . $request->email);
+            return back()->with('success', 'Compact e-ticket sent successfully to ' . $request->email);
 
         } catch (\Exception $e) {
             // Log the actual error for debugging

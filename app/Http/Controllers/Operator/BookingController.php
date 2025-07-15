@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class BookingController extends Controller
 {
@@ -495,7 +496,7 @@ class BookingController extends Controller
     }
 
     /**
-     * Generate and display ticket.
+     * Generate and display compact ticket.
      */
     public function ticket(Booking $booking)
     {
@@ -508,9 +509,40 @@ class BookingController extends Controller
             return back()->with('error', 'Ticket can only be generated for confirmed bookings.');
         }
 
-        $booking->load(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus.busType']);
+        $booking->load(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus.busType', 'schedule.operator']);
 
-        return view('operator.bookings.ticket', compact('booking'));
+        return view('operator.bookings.compact-ticket', compact('booking'));
+    }
+
+    /**
+     * Download compact ticket as PDF.
+     */
+    public function downloadCompactTicket(Booking $booking)
+    {
+        // Ensure operator owns this booking
+        if ($booking->schedule->operator_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to booking');
+        }
+
+        if ($booking->status !== 'confirmed') {
+            return back()->with('error', 'Ticket can only be downloaded for confirmed bookings.');
+        }
+
+        $booking->load([
+            'user',
+            'schedule.route.sourceCity',
+            'schedule.route.destinationCity',
+            'schedule.bus.busType',
+            'schedule.operator'
+        ]);
+
+        // Generate Compact PDF
+        $pdf = Pdf::loadView('tickets.compact-pdf', compact('booking'));
+        $pdf->setPaper([0, 0, 288, 432], 'portrait'); // 4x6 inches in points for compact size
+
+        $filename = 'BookNGO-Operator-Compact-Ticket-' . $booking->booking_reference . '.pdf';
+
+        return $pdf->download($filename);
     }
 
     /**

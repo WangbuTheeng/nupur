@@ -26,7 +26,7 @@
             <!-- Search Form -->
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-                    <form method="POST" action="{{ route('search.index') }}" x-data="{
+                    <form method="POST" action="{{ route('search.results') }}" x-data="{
                         swapCities() {
                             const source = this.$refs.source.value;
                             const destination = this.$refs.destination.value;

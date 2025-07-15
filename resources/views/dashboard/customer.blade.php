@@ -7,8 +7,9 @@
 @endpush
 
 @section('content')
+
 <!-- Hero Section with Gradient Background -->
-<div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+<div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white mt-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="flex flex-col lg:flex-row items-center justify-between">
             <div class="text-center lg:text-left mb-8 lg:mb-0">
@@ -51,6 +52,92 @@
 </div>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
+
+    <!-- Quick Search Widget -->
+    <div class="mb-12">
+        <div class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100">
+            <div class="flex items-center mb-6">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">Quick Search & Book</h3>
+                <p class="text-gray-600 ml-4">Find your perfect bus journey in seconds</p>
+            </div>
+
+            <!-- Quick Search Form -->
+            <form method="POST" action="{{ route('search.results') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" id="quick-search-form">
+                @csrf
+                <div>
+                    <label for="quick_source_city_id" class="block text-sm font-medium text-gray-700 mb-2">From</label>
+                    <select name="source_city_id" id="quick_source_city_id" required
+                            class="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="">Select departure</option>
+                        @foreach(\App\Models\City::active()->withActiveRoutes()->orderBy('name')->get()->unique('name') as $city)
+                            <option value="{{ $city->id }}">{{ $city->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Swap Button -->
+                <div class="flex items-end justify-center">
+                    <button type="button" id="swap-cities-btn"
+                            class="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors duration-200 group">
+                        <svg class="w-5 h-5 text-blue-600 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div>
+                    <label for="quick_destination_city_id" class="block text-sm font-medium text-gray-700 mb-2">To</label>
+                    <select name="destination_city_id" id="quick_destination_city_id" required
+                            class="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="">Select destination</option>
+                        @foreach(\App\Models\City::active()->withActiveRoutes()->orderBy('name')->get()->unique('name') as $city)
+                            <option value="{{ $city->id }}">{{ $city->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label for="quick_travel_date" class="block text-sm font-medium text-gray-700 mb-2">Travel Date</label>
+                    <input type="date" name="travel_date" id="quick_travel_date" required
+                           min="{{ date('Y-m-d') }}"
+                           value="{{ date('Y-m-d') }}"
+                           class="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                </div>
+
+                <div>
+                    <label for="quick_passengers" class="block text-sm font-medium text-gray-700 mb-2">Passengers</label>
+                    <select name="passengers" id="quick_passengers"
+                            class="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="1">1 Passenger</option>
+                        <option value="2">2 Passengers</option>
+                        <option value="3">3 Passengers</option>
+                        <option value="4">4 Passengers</option>
+                        <option value="5">5 Passengers</option>
+                        <option value="6">6 Passengers</option>
+                        <option value="7">7 Passengers</option>
+                        <option value="8">8 Passengers</option>
+                        <option value="9">9 Passengers</option>
+                        <option value="10">10 Passengers</option>
+                    </select>
+                </div>
+
+                <div class="flex items-end">
+                    <button type="submit"
+                            class="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Statistics Cards with Modern Design -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -422,11 +509,7 @@
     @endif
 </div>
 
-<!-- Alpine.js Test Component -->
-<div x-data="{ test: 'Alpine.js is working!' }" class="fixed bottom-4 right-4 bg-green-500 text-white p-2 rounded shadow-lg z-50">
-    <span x-text="test"></span>
-    <button @click="test = 'Button clicked!'" class="ml-2 bg-green-700 px-2 py-1 rounded text-xs">Test</button>
-</div>
+
 
 @push('scripts')
 <script>
@@ -518,7 +601,67 @@ document.addEventListener('DOMContentLoaded', function() {
         background: #a8a8a8;
     }
 </style>
-@endpush
-@endpush
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Quick search form functionality
+    const swapBtn = document.getElementById('swap-cities-btn');
+    const sourceSelect = document.getElementById('quick_source_city_id');
+    const destinationSelect = document.getElementById('quick_destination_city_id');
+    const searchForm = document.getElementById('quick-search-form');
+
+    // Swap cities functionality
+    if (swapBtn && sourceSelect && destinationSelect) {
+        swapBtn.addEventListener('click', function() {
+            const sourceValue = sourceSelect.value;
+            const destinationValue = destinationSelect.value;
+
+            sourceSelect.value = destinationValue;
+            destinationSelect.value = sourceValue;
+        });
+    }
+
+    // Form validation
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            const source = sourceSelect.value;
+            const destination = destinationSelect.value;
+
+            if (source === destination && source !== '') {
+                e.preventDefault();
+                alert('Please select different cities for departure and destination.');
+                return false;
+            }
+
+            if (!source || !destination) {
+                e.preventDefault();
+                alert('Please select both departure and destination cities.');
+                return false;
+            }
+        });
+    }
+
+    // Auto-update destination options based on source selection (optional enhancement)
+    if (sourceSelect && destinationSelect) {
+        sourceSelect.addEventListener('change', function() {
+            const selectedSource = this.value;
+
+            // Reset destination if same as source
+            if (destinationSelect.value === selectedSource) {
+                destinationSelect.value = '';
+            }
+        });
+
+        destinationSelect.addEventListener('change', function() {
+            const selectedDestination = this.value;
+
+            // Reset source if same as destination
+            if (sourceSelect.value === selectedDestination) {
+                sourceSelect.value = '';
+            }
+        });
+    }
+});
+</script>
 
 @endsection

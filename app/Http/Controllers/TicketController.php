@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 
 class TicketController extends Controller
@@ -19,7 +20,7 @@ class TicketController extends Controller
     }
 
     /**
-     * Generate and download ticket for a booking.
+     * Generate and download compact ticket for a booking.
      */
     public function download(Booking $booking)
     {
@@ -33,14 +34,20 @@ class TicketController extends Controller
             return back()->with('error', 'Ticket can only be downloaded for confirmed bookings.');
         }
 
-        $booking->load(['schedule.route', 'schedule.bus', 'user']);
+        $booking->load([
+            'schedule.route.sourceCity',
+            'schedule.route.destinationCity',
+            'schedule.bus.busType',
+            'schedule.operator'
+        ]);
 
-        // Generate ticket HTML
-        $ticketHtml = $this->generateTicketHtml($booking);
+        // Generate compact ticket PDF
+        $pdf = Pdf::loadView('tickets.compact-pdf', compact('booking'));
+        $pdf->setPaper([0, 0, 288, 432], 'portrait'); // 4x6 inches in points for compact size
 
-        return response($ticketHtml)
-            ->header('Content-Type', 'text/html')
-            ->header('Content-Disposition', 'attachment; filename="ticket-' . $booking->booking_reference . '.html"');
+        $filename = 'BookNGO-Compact-Ticket-' . $booking->booking_reference . '.pdf';
+
+        return $pdf->download($filename);
     }
 
     /**

@@ -55,6 +55,7 @@ Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->
     Route::get('bookings/today', [BookingController::class, 'today'])->name('bookings.today');
     Route::get('bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
     Route::get('bookings/{booking}/ticket', [BookingController::class, 'ticket'])->name('bookings.ticket');
+    Route::get('bookings/{booking}/download-compact-ticket', [BookingController::class, 'downloadCompactTicket'])->name('bookings.download-compact-ticket');
     Route::get('bookings/export', [BookingController::class, 'export'])->name('bookings.export');
     Route::get('bookings/{booking}/receipt', [BookingController::class, 'receipt'])->name('bookings.receipt');
     
