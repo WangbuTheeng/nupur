@@ -57,6 +57,10 @@
                             <span class="text-sm text-gray-700">Selected</span>
                         </div>
                         <div class="flex items-center space-x-2">
+                            <div class="w-6 h-6 bg-blue-500 rounded border-2 border-blue-600"></div>
+                            <span class="text-sm text-gray-700">Reserved</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
                             <div class="w-6 h-6 bg-red-500 rounded border-2 border-red-600"></div>
                             <span class="text-sm text-gray-700">Booked</span>
                         </div>
@@ -230,12 +234,28 @@
                         </div>
                     </div>
 
-                    <!-- Proceed Button -->
-                    <button id="proceed-button" 
-                            class="w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed"
-                            disabled>
-                        Select seats to continue
-                    </button>
+                    <!-- Action Buttons -->
+                    <div class="space-y-3">
+                        <!-- Reserve Seats Button -->
+                        <button id="reserve-button"
+                                class="w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                disabled>
+                            <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Reserve Seats (1 hour)
+                        </button>
+
+                        <!-- Proceed to Book Button -->
+                        <button id="proceed-button"
+                                class="w-full bg-green-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                disabled>
+                            <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Book Now
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -410,6 +430,13 @@
     cursor: not-allowed;
 }
 
+.seat-reserved {
+    background: #3b82f6;
+    color: white;
+    border-color: #1d4ed8;
+    cursor: not-allowed;
+}
+
 .aisle-space {
     width: 20px;
     height: 40px;
@@ -483,19 +510,88 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedSeatsList.innerHTML = '<div class="text-gray-500 text-sm">No seats selected</div>';
         }
         
-        // Update proceed button
+        // Update buttons
+        const reserveButton = document.getElementById('reserve-button');
         const proceedButton = document.getElementById('proceed-button');
+
         if (count > 0) {
+            // Enable reserve button
+            reserveButton.disabled = false;
+            reserveButton.className = 'w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-blue-700';
+            reserveButton.onclick = reserveSeats;
+
+            // Enable proceed button
             proceedButton.disabled = false;
-            proceedButton.className = 'w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200';
-            proceedButton.textContent = `Continue with ${count} seat(s)`;
+            proceedButton.className = 'w-full bg-green-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-green-700';
             proceedButton.onclick = proceedToPassengerDetails;
         } else {
+            // Disable reserve button
+            reserveButton.disabled = true;
+            reserveButton.className = 'w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed';
+            reserveButton.onclick = null;
+
+            // Disable proceed button
             proceedButton.disabled = true;
             proceedButton.className = 'w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed';
-            proceedButton.textContent = 'Select seats to continue';
             proceedButton.onclick = null;
         }
+    }
+
+    function reserveSeats() {
+        if (selectedSeats.length === 0) return;
+
+        // Show loading state
+        const reserveButton = document.getElementById('reserve-button');
+        const originalText = reserveButton.innerHTML;
+        reserveButton.disabled = true;
+        reserveButton.innerHTML = '<svg class="w-5 h-5 inline-block mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Reserving...';
+
+        // Reserve seats via AJAX
+        fetch('{{ route("booking.reserve-seats-only") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                schedule_id: scheduleId,
+                seat_numbers: selectedSeats
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Seats ${selectedSeats.join(', ')} have been reserved for 1 hour. You can proceed to book them anytime within this period.`);
+
+                // Update seat colors to blue (reserved)
+                selectedSeats.forEach(seatNumber => {
+                    const seatElement = document.querySelector(`[data-seat-number="${seatNumber}"]`);
+                    if (seatElement) {
+                        seatElement.classList.remove('seat-selected');
+                        seatElement.classList.add('seat-reserved');
+                        seatElement.style.background = '#3b82f6';
+                        seatElement.style.borderColor = '#1d4ed8';
+                        seatElement.style.cursor = 'not-allowed';
+                        seatElement.onclick = null;
+                    }
+                });
+
+                // Clear selection
+                selectedSeats = [];
+                updateBookingSummary();
+            } else {
+                alert(data.message || 'Failed to reserve seats. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        })
+        .finally(() => {
+            // Restore button state
+            reserveButton.disabled = false;
+            reserveButton.innerHTML = originalText;
+        });
     }
 
     function proceedToPassengerDetails() {

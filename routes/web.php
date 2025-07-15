@@ -255,8 +255,8 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 // eSewa Payment Callback Routes (must be outside auth middleware)
-Route::get('/payment/esewa/success', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
-Route::get('/payment/esewa/failure', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
+Route::get('/payment/esewa/success/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
+Route::get('/payment/esewa/failure/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

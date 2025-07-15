@@ -94,9 +94,9 @@
 }
 
 .seat.reserved {
-    background: #6b7280;
+    background: #3b82f6;
     color: white;
-    border-color: #4b5563;
+    border-color: #1d4ed8;
     cursor: not-allowed;
 }
 
@@ -572,7 +572,7 @@
     }
 
     .seat.reserved {
-        background: #666666;
+        background: #0066cc;
         color: #fff;
         border-color: #fff;
     }

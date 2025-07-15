@@ -198,7 +198,15 @@
                         </a>
 
                         @if($booking->status === 'pending')
-                            <button class="w-full bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold transition-colors">
+                            <a href="{{ route('payment.index', $booking) }}"
+                               class="w-full bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-semibold transition-colors text-center block">
+                                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                                Proceed with Payment
+                            </a>
+
+                            <button id="cancel-booking-btn" class="w-full bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold transition-colors">
                                 <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
@@ -236,4 +244,116 @@
         </div>
     </div>
 </div>
+
+<!-- Cancel Booking Modal -->
+@if($booking->status === 'pending')
+<div id="cancel-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Cancel Booking</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    Are you sure you want to cancel this booking? This action cannot be undone.
+                </p>
+                <p class="text-sm text-gray-700 mt-2 font-medium">
+                    Booking Reference: {{ $booking->booking_reference }}
+                </p>
+            </div>
+            <div class="items-center px-4 py-3">
+                <div class="flex space-x-3">
+                    <button id="confirm-cancel-btn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300">
+                        Yes, Cancel Booking
+                    </button>
+                    <button id="close-modal-btn" class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        No, Keep Booking
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+<script>
+@if($booking->status === 'pending')
+document.addEventListener('DOMContentLoaded', function() {
+    const cancelBtn = document.getElementById('cancel-booking-btn');
+    const modal = document.getElementById('cancel-modal');
+    const confirmBtn = document.getElementById('confirm-cancel-btn');
+    const closeBtn = document.getElementById('close-modal-btn');
+
+    // Show modal when cancel button is clicked
+    cancelBtn.addEventListener('click', function() {
+        modal.classList.remove('hidden');
+    });
+
+    // Hide modal when close button is clicked
+    closeBtn.addEventListener('click', function() {
+        modal.classList.add('hidden');
+    });
+
+    // Hide modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    });
+
+    // Handle booking cancellation
+    confirmBtn.addEventListener('click', function() {
+        // Show loading state
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<svg class="w-4 h-4 inline-block mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Cancelling...';
+
+        // Send cancellation request
+        fetch('{{ route("customer.bookings.cancel", $booking) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                reason: 'Customer requested cancellation'
+            })
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.success) {
+                // Show success message and redirect
+                alert('Booking cancelled successfully.');
+                window.location.href = '{{ route("customer.bookings.index") }}';
+            } else {
+                alert(data.message || 'Failed to cancel booking. Please try again.');
+                // Restore button state
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'Yes, Cancel Booking';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again. Check console for details.');
+            // Restore button state
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Yes, Cancel Booking';
+        });
+    });
+});
+@endif
+</script>
+
 @endsection

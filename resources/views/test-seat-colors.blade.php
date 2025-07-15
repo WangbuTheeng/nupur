@@ -27,8 +27,8 @@
                     <span>Red = Booked</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-6 h-6 bg-gray-500 rounded"></div>
-                    <span>Grey = Reserved</span>
+                    <div class="w-6 h-6 bg-blue-500 rounded"></div>
+                    <span>Blue = Reserved</span>
                 </div>
             </div>
         </div>

@@ -26,14 +26,17 @@ class Booking extends Model
         'booking_type',
         'payment_method',
         'payment_status',
-        'booked_by'
+        'booked_by',
+        'cancelled_at',
+        'cancellation_reason'
     ];
 
     protected $casts = [
         'seat_numbers' => 'array',
         'passenger_details' => 'array',
         'total_amount' => 'decimal:2',
-        'booking_expires_at' => 'datetime'
+        'booking_expires_at' => 'datetime',
+        'cancelled_at' => 'datetime'
     ];
 
     protected static function boot()

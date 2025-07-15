@@ -140,9 +140,13 @@
         </div>
         
         <div>
-            <a href="/" class="button button-retry">Try Again</a>
-            <a href="/" class="button">Go to Home</a>
-            <a href="/login" class="button button-secondary">Login</a>
+            @auth
+                <a href="{{ route('customer.bookings.index') }}" class="button button-retry">Back to My Bookings</a>
+                <a href="{{ route('customer.dashboard') }}" class="button">Go to Dashboard</a>
+            @else
+                <a href="{{ route('login') }}" class="button button-retry">Login to Continue</a>
+                <a href="{{ route('home') }}" class="button">Go to Home</a>
+            @endauth
         </div>
         
         <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">

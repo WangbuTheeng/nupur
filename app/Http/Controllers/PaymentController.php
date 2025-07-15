@@ -81,24 +81,79 @@ class PaymentController extends Controller
     /**
      * Handle eSewa payment success callback (v2 API)
      */
-    public function esewaSuccess(Request $request)
+    public function esewaSuccess(Request $request, $payment = null)
     {
         try {
-            $paymentId = $request->get('payment_id');
+            // Try to get data from query parameter first
             $encodedData = $request->get('data');
 
+            // If not found in query, check if it's in the URL path (common eSewa callback issue)
+            if (!$encodedData) {
+                $fullUrl = $request->fullUrl();
+                if (preg_match('/data=([^&]+)/', $fullUrl, $matches)) {
+                    $encodedData = $matches[1];
+                }
+            }
+
+            // Also check if payment_id contains the data (another common issue)
+            if (!$encodedData) {
+                $paymentId = $request->get('payment_id');
+                if ($paymentId && strpos($paymentId, '?data=') !== false) {
+                    $parts = explode('?data=', $paymentId);
+                    if (count($parts) > 1) {
+                        $encodedData = $parts[1];
+                    }
+                }
+            }
+
             Log::info('eSewa Success Callback', [
-                'payment_id' => $paymentId,
                 'encoded_data' => $encodedData,
-                'all_request_data' => $request->all()
+                'all_request_data' => $request->all(),
+                'full_url' => $request->fullUrl()
             ]);
 
-            // For now, just show a simple success page
-            return view('payment.simple-success', [
-                'message' => 'Payment completed successfully!',
-                'payment_id' => $paymentId,
-                'encoded_data' => $encodedData
+            if (!$encodedData) {
+                throw new \Exception('No payment data received from eSewa');
+            }
+
+            // Decode Base64 response
+            $decodedData = base64_decode($encodedData);
+            $responseData = json_decode($decodedData, true);
+
+            if (!$responseData) {
+                throw new \Exception('Invalid response data from eSewa');
+            }
+
+            Log::info('eSewa Response Data', [
+                'decoded_data' => $responseData
             ]);
+
+            // Find payment by transaction UUID
+            $transactionUuid = $responseData['transaction_uuid'] ?? null;
+            if (!$transactionUuid) {
+                throw new \Exception('Transaction UUID not found in response');
+            }
+
+            $payment = Payment::where('transaction_id', $transactionUuid)->first();
+            if (!$payment) {
+                throw new \Exception('Payment record not found for transaction: ' . $transactionUuid);
+            }
+
+            // Verify payment with eSewa service
+            $verificationResult = $this->esewaService->verifyPayment($payment->id, $encodedData);
+
+            if ($verificationResult['success']) {
+                $booking = $payment->booking;
+
+                // Redirect to ticket page for successful payment
+                return redirect()->route('customer.tickets.show', $booking)
+                    ->with('success', 'Payment completed successfully! Your ticket is ready.');
+            } else {
+                // Payment verification failed
+                return view('payment.simple-failure', [
+                    'error_message' => $verificationResult['message'] ?? 'Payment verification failed.'
+                ]);
+            }
 
         } catch (\Exception $e) {
             Log::error('eSewa payment success handling error', [
@@ -116,10 +171,10 @@ class PaymentController extends Controller
     /**
      * Handle eSewa payment failure callback
      */
-    public function esewaFailure(Request $request)
+    public function esewaFailure(Request $request, $payment = null)
     {
         try {
-            $paymentId = $request->get('payment_id');
+            $paymentId = $payment ?: $request->get('payment_id');
 
             Log::info('eSewa Failure Callback', [
                 'payment_id' => $paymentId,

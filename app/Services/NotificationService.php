@@ -198,7 +198,7 @@ class NotificationService
     public function sendOperatorBookingNotification($booking)
     {
         $operator = $booking->schedule->operator;
-        
+
         return $this->sendNotification(
             $operator,
             'new_booking',
@@ -215,6 +215,36 @@ class NotificationService
             'View Booking',
             'medium',
             ['database', 'realtime']
+        );
+    }
+
+    /**
+     * Send seat reservation expiry notification.
+     */
+    public function sendSeatReservationExpiry($reservation)
+    {
+        $schedule = $reservation->schedule;
+        $minutesLeft = now()->diffInMinutes($reservation->expires_at);
+
+        return $this->sendNotification(
+            $reservation->user,
+            'seat_reservation_expiry',
+            'Seat Reservation Expiring Soon',
+            "Your seat reservation for {$schedule->route->full_name} will expire in {$minutesLeft} minutes. Complete your booking to secure your seats.",
+            [
+                'reservation_id' => $reservation->id,
+                'schedule_id' => $schedule->id,
+                'seat_numbers' => $reservation->seat_numbers,
+                'route' => $schedule->route->full_name,
+                'travel_date' => $schedule->travel_date->format('Y-m-d'),
+                'departure_time' => $schedule->departure_time->format('H:i'),
+                'expires_at' => $reservation->expires_at,
+                'minutes_left' => $minutesLeft,
+            ],
+            route('booking.seat-selection', $schedule),
+            'Complete Booking',
+            'high',
+            ['database', 'realtime', 'sms']
         );
     }
 

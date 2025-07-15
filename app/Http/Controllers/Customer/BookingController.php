@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\Booking;
+use App\Models\SeatReservation;
 use App\Events\SeatUpdated;
 use App\Events\BookingStatusUpdated;
+use App\Services\SeatReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,12 @@ use Carbon\Carbon;
 
 class BookingController extends Controller
 {
+    protected $reservationService;
+
+    public function __construct(SeatReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
     /**
      * Display customer's bookings.
      */
@@ -129,24 +137,75 @@ class BookingController extends Controller
             ], 422);
         }
 
-        // Reserve seats temporarily (15 minutes)
-        $reservationKey = 'seat_reservation_' . $schedule->id . '_' . Auth::id();
-        $reservationData = [
-            'user_id' => Auth::id(),
-            'schedule_id' => $schedule->id,
-            'seat_numbers' => $requestedSeats,
-            'reserved_at' => now(),
-            'expires_at' => now()->addMinutes(15),
-        ];
+        // Reserve seats using the new service (1 hour)
+        $result = $this->reservationService->reserveSeats(Auth::id(), $schedule->id, $requestedSeats, 60);
 
-        Cache::put($reservationKey, $reservationData, 15 * 60); // 15 minutes
+        if ($result['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => $result['message'],
+                'reservation_expires_at' => $result['expires_at'],
+                'redirect_url' => route('booking.passenger-details', $schedule),
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+    }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Seats reserved successfully.',
-            'reservation_expires_at' => $reservationData['expires_at'],
-            'redirect_url' => route('booking.passenger-details', $schedule),
+    /**
+     * Reserve selected seats only (without proceeding to booking).
+     */
+    public function reserveSeatsOnly(Request $request)
+    {
+        $request->validate([
+            'schedule_id' => 'required|exists:schedules,id',
+            'seat_numbers' => 'required|array|min:1|max:10',
+            'seat_numbers.*' => 'integer|min:1',
         ]);
+
+        $schedule = Schedule::findOrFail($request->schedule_id);
+
+        // Check if schedule is still bookable online
+        if (!$schedule->isBookableOnline()) {
+            $message = $schedule->hasFinished()
+                ? 'This schedule has already departed and is no longer available for booking.'
+                : 'Online booking for this schedule has closed. Please visit the counter for booking.';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
+        }
+
+        $requestedSeats = $request->seat_numbers;
+
+        // Check if seats are available
+        $unavailableSeats = $this->reservationService->getUnavailableSeats($schedule->id, $requestedSeats);
+        if (!empty($unavailableSeats)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some seats are no longer available: ' . implode(', ', $unavailableSeats),
+            ], 422);
+        }
+
+        // Reserve seats using the new service (1 hour)
+        $result = $this->reservationService->reserveSeats(Auth::id(), $schedule->id, $requestedSeats, 60);
+
+        if ($result['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Seats reserved successfully for 1 hour.',
+                'reservation_expires_at' => $result['expires_at'],
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
     }
 
     /**
@@ -154,9 +213,11 @@ class BookingController extends Controller
      */
     public function passengerDetails(Schedule $schedule)
     {
-        // Check if user has reserved seats
-        $reservationKey = 'seat_reservation_' . $schedule->id . '_' . Auth::id();
-        $reservation = Cache::get($reservationKey);
+        // Check if user has reserved seats using new system
+        $reservation = SeatReservation::where('user_id', Auth::id())
+                                    ->where('schedule_id', $schedule->id)
+                                    ->active()
+                                    ->first();
 
         if (!$reservation) {
             return redirect()->route('booking.seat-selection', $schedule)
@@ -164,7 +225,7 @@ class BookingController extends Controller
         }
 
         $schedule->load(['route.sourceCity', 'route.destinationCity', 'bus.busType', 'operator']);
-        $seatNumbers = $reservation['seat_numbers'];
+        $seatNumbers = $reservation->seat_numbers;
 
         return view('customer.booking.passenger-details', compact('schedule', 'seatNumbers', 'reservation'));
     }
@@ -197,24 +258,20 @@ class BookingController extends Controller
             return back()->with('error', 'Online booking is no longer available for this schedule.');
         }
 
-        // Check seat reservation
-        $reservationKey = 'seat_reservation_' . $schedule->id . '_' . Auth::id();
-        $reservation = Cache::get($reservationKey);
+        // Check seat reservation using new system
+        $reservation = SeatReservation::where('user_id', Auth::id())
+                                    ->where('schedule_id', $schedule->id)
+                                    ->active()
+                                    ->first();
 
         if (!$reservation) {
             return back()->with('error', 'Seat reservation expired. Please start booking again.');
         }
 
-        // Validate reservation exists and has seat numbers
-        if (!$reservation || !isset($reservation['seat_numbers']) || empty($reservation['seat_numbers'])) {
-            return back()->withInput()
-                ->with('error', 'Invalid seat reservation. Please select seats again.');
-        }
-
         DB::beginTransaction();
         try {
             // Calculate total amount
-            $seatNumbers = $reservation['seat_numbers'] ?? [];
+            $seatNumbers = $reservation->seat_numbers;
             $passengerCount = count($seatNumbers);
 
             if ($passengerCount === 0) {
@@ -267,8 +324,8 @@ class BookingController extends Controller
             // Fire booking status update event
             event(new BookingStatusUpdated($booking));
 
-            // Clear seat reservation
-            Cache::forget($reservationKey);
+            // Convert reservation to booking
+            $this->reservationService->convertToBooking(Auth::id(), $schedule->id);
 
             DB::commit();
 
@@ -341,6 +398,82 @@ class BookingController extends Controller
         $booking->load(['schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus.busType', 'schedule.operator']);
 
         return view('customer.bookings.show', compact('booking'));
+    }
+
+    /**
+     * Cancel a customer booking.
+     */
+    public function cancel(Request $request, Booking $booking)
+    {
+        // Add logging for debugging
+        \Log::info('Cancel booking request received', [
+            'booking_id' => $booking->id,
+            'user_id' => Auth::id(),
+            'booking_user_id' => $booking->user_id,
+            'booking_status' => $booking->status
+        ]);
+
+        // Ensure user can only cancel their own bookings
+        if ($booking->user_id !== Auth::id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to booking.',
+            ], 403);
+        }
+
+        // Check if booking can be cancelled
+        if ($booking->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending bookings can be cancelled.',
+            ], 422);
+        }
+
+        $request->validate([
+            'reason' => 'nullable|string|max:500'
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Update booking status
+            $booking->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancellation_reason' => $request->reason ?? 'Customer requested cancellation'
+            ]);
+
+            // Restore available seats
+            $booking->schedule->increment('available_seats', $booking->passenger_count);
+
+            // Release any seat reservations for this user and schedule
+            $this->reservationService->releaseSeats(Auth::id(), $booking->schedule_id);
+
+            // Fire seat update events for each cancelled seat
+            foreach ($booking->seat_numbers as $seatNumber) {
+                event(new SeatUpdated($booking->schedule, $seatNumber, 'available', Auth::id()));
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking cancelled successfully.',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            \Log::error('Error cancelling booking', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel booking: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

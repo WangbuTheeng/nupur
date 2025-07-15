@@ -25,3 +25,6 @@ Artisan::command('schedules:update-status', function () {
 
 // Schedule the command to run every minute
 Schedule::command('schedules:update-status')->everyMinute();
+
+// Schedule seat reservation cleanup every 5 minutes
+Schedule::command('reservations:cleanup --send-notifications')->everyFiveMinutes();

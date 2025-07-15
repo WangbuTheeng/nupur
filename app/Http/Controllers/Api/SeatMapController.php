@@ -4,13 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
+use App\Models\SeatReservation;
 use App\Events\SeatUpdated;
+use App\Services\SeatReservationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
 class SeatMapController extends Controller
 {
+    protected $reservationService;
+
+    public function __construct(SeatReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
     /**
      * Get real-time seat map for a schedule.
      */
@@ -65,45 +73,21 @@ class SeatMapController extends Controller
         $seatNumbers = $request->seat_numbers;
         $userId = Auth::id();
 
-        // Check if seats are available
-        $bookedSeats = $schedule->bookings()
-            ->where('status', '!=', 'cancelled')
-            ->pluck('seat_numbers')
-            ->flatten()
-            ->toArray();
+        // Use the new reservation service with 1-hour expiration
+        $result = $this->reservationService->reserveSeats($userId, $schedule->id, $seatNumbers, 60);
 
-        $reservedSeats = $this->getReservedSeats($schedule->id);
-
-        foreach ($seatNumbers as $seatNumber) {
-            if (in_array($seatNumber, $bookedSeats) || in_array($seatNumber, $reservedSeats)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Seat {$seatNumber} is not available.",
-                ], 400);
-            }
+        if ($result['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => $result['message'],
+                'reservation_expires_at' => $result['expires_at'],
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 400);
         }
-
-        // Reserve seats for 10 minutes
-        $reservationKey = 'seat_reservation_' . $schedule->id . '_' . $userId;
-        $reservationData = [
-            'seat_numbers' => $seatNumbers,
-            'user_id' => $userId,
-            'schedule_id' => $schedule->id,
-            'expires_at' => now()->addMinutes(10),
-        ];
-
-        Cache::put($reservationKey, $reservationData, 600); // 10 minutes
-
-        // Fire seat update events
-        foreach ($seatNumbers as $seatNumber) {
-            event(new SeatUpdated($schedule, $seatNumber, 'reserved', $userId));
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Seats reserved successfully.',
-            'reservation_expires_at' => $reservationData['expires_at'],
-        ]);
     }
 
     /**
@@ -112,28 +96,21 @@ class SeatMapController extends Controller
     public function releaseSeats(Request $request, Schedule $schedule)
     {
         $userId = Auth::id();
-        $reservationKey = 'seat_reservation_' . $schedule->id . '_' . $userId;
 
-        $reservation = Cache::get($reservationKey);
+        // Use the new reservation service
+        $result = $this->reservationService->releaseSeats($userId, $schedule->id);
 
-        if ($reservation) {
-            // Fire seat update events
-            foreach ($reservation['seat_numbers'] as $seatNumber) {
-                event(new SeatUpdated($schedule, $seatNumber, 'available', $userId));
-            }
-
-            Cache::forget($reservationKey);
-
+        if ($result['success']) {
             return response()->json([
                 'success' => true,
-                'message' => 'Seats released successfully.',
+                'message' => $result['message'],
             ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 404);
         }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'No reservation found.',
-        ], 404);
     }
 
     /**
@@ -141,27 +118,6 @@ class SeatMapController extends Controller
      */
     private function getReservedSeats($scheduleId)
     {
-        $reservedSeats = [];
-
-        // For database cache, we'll use a different approach
-        // Get all cache entries for this schedule from the database
-        try {
-            $cacheEntries = \DB::table('cache')
-                ->where('key', 'like', 'laravel_cache:seat_reservation_' . $scheduleId . '_%')
-                ->get();
-
-            foreach ($cacheEntries as $entry) {
-                $data = unserialize($entry->value);
-                if (isset($data['seat_numbers']) && is_array($data['seat_numbers'])) {
-                    $reservedSeats = array_merge($reservedSeats, $data['seat_numbers']);
-                }
-            }
-        } catch (\Exception $e) {
-            // If there's an error with cache lookup, just return empty array
-            // This ensures the seat map still works even if cache is unavailable
-            \Log::warning('Failed to get reserved seats from cache: ' . $e->getMessage());
-        }
-
-        return array_unique($reservedSeats);
+        return $this->reservationService->getReservedSeats($scheduleId);
     }
 }
