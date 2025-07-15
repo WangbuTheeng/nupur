@@ -134,6 +134,11 @@ class PaymentController extends Controller
                     'form_html' => $result['form_html']
                 ]);
             } else {
+                // If eSewa is unavailable, show error with fallback option
+                if (isset($result['error_code']) && $result['error_code'] === 'ESEWA_UNAVAILABLE') {
+                    return back()->with('error', $result['message'])
+                                ->with('show_test_payment', true);
+                }
                 return back()->with('error', $result['message']);
             }
 

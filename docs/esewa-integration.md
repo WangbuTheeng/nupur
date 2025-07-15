@@ -17,11 +17,11 @@ The eSewa integration has been updated to use the new v2 API which includes:
 Add the following to your `.env` file:
 
 ```env
-# eSewa Payment Gateway
+# eSewa Payment Gateway (v2 API)
 ESEWA_MERCHANT_ID=EPAYTEST
 ESEWA_SECRET_KEY="8gBm/:&EnhH.1/q"
-ESEWA_BASE_URL=https://rc-epay.esewa.com.np
-ESEWA_PAYMENT_URL=https://rc-epay.esewa.com.np/api/epay/main/v2/form
+ESEWA_BASE_URL=https://epay.esewa.com.np
+ESEWA_PAYMENT_URL=https://epay.esewa.com.np/api/epay/main/v2/form
 ESEWA_STATUS_CHECK_URL=https://rc.esewa.com.np/api/epay/transaction/status/
 ESEWA_SUCCESS_URL="${APP_URL}/payment/esewa/success"
 ESEWA_FAILURE_URL="${APP_URL}/payment/esewa/failure"

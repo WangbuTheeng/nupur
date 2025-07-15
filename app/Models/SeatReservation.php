@@ -136,23 +136,42 @@ class SeatReservation extends Model
 
     /**
      * Create or update reservation for user and schedule.
+     * This method will ADD new seats to existing reservations instead of replacing them.
      */
     public static function createOrUpdate($userId, $scheduleId, $seatNumbers, $expiresAt = null)
     {
         $expiresAt = $expiresAt ?: now()->addHour(); // Default 1 hour
 
-        return static::updateOrCreate(
-            [
+        // Check if user already has a reservation for this schedule
+        $existingReservation = static::where('user_id', $userId)
+                                   ->where('schedule_id', $scheduleId)
+                                   ->active()
+                                   ->first();
+
+        if ($existingReservation) {
+            // Merge new seats with existing ones (avoid duplicates)
+            $existingSeats = $existingReservation->seat_numbers;
+            $mergedSeats = array_unique(array_merge($existingSeats, $seatNumbers));
+
+            // Update existing reservation with merged seats and extended expiry
+            $existingReservation->update([
+                'seat_numbers' => $mergedSeats,
+                'expires_at' => $expiresAt,
+                'notified_at' => null // Reset notification status
+            ]);
+
+            return $existingReservation;
+        } else {
+            // Create new reservation
+            return static::create([
                 'user_id' => $userId,
-                'schedule_id' => $scheduleId
-            ],
-            [
+                'schedule_id' => $scheduleId,
                 'seat_numbers' => $seatNumbers,
                 'status' => 'active',
                 'expires_at' => $expiresAt,
-                'notified_at' => null // Reset notification status
-            ]
-        );
+                'notified_at' => null
+            ]);
+        }
     }
 
     /**

@@ -21,30 +21,44 @@ class SeatReservationService
             $schedule = Schedule::findOrFail($scheduleId);
             $expiresAt = now()->addMinutes($duration);
 
-            // Check if seats are available
-            $unavailableSeats = $this->getUnavailableSeats($scheduleId, $seatNumbers, $userId);
-            if (!empty($unavailableSeats)) {
-                return [
-                    'success' => false,
-                    'message' => 'Some seats are no longer available: ' . implode(', ', $unavailableSeats)
-                ];
+            // Get user's existing reservation to check what seats they already have
+            $existingReservation = SeatReservation::where('user_id', $userId)
+                                                 ->where('schedule_id', $scheduleId)
+                                                 ->active()
+                                                 ->first();
+
+            $existingSeats = $existingReservation ? $existingReservation->seat_numbers : [];
+
+            // Only check availability for truly new seats (not already reserved by this user)
+            $newSeats = array_diff($seatNumbers, $existingSeats);
+
+            if (!empty($newSeats)) {
+                // Check if new seats are available
+                $unavailableSeats = $this->getUnavailableSeats($scheduleId, $newSeats, $userId);
+                if (!empty($unavailableSeats)) {
+                    return [
+                        'success' => false,
+                        'message' => 'Some seats are no longer available: ' . implode(', ', $unavailableSeats)
+                    ];
+                }
             }
 
-            // Create or update reservation
+            // Create or update reservation (this will merge with existing seats)
             $reservation = SeatReservation::createOrUpdate($userId, $scheduleId, $seatNumbers, $expiresAt);
 
             // Update cache for real-time updates
             $this->updateSeatCache($scheduleId);
 
-            // Fire seat update events
-            foreach ($seatNumbers as $seatNumber) {
+            // Fire seat update events only for newly reserved seats
+            foreach ($newSeats as $seatNumber) {
                 event(new SeatUpdated($schedule, $seatNumber, 'reserved', $userId));
             }
 
             Log::info('Seats reserved successfully', [
                 'user_id' => $userId,
                 'schedule_id' => $scheduleId,
-                'seat_numbers' => $seatNumbers,
+                'new_seat_numbers' => $newSeats,
+                'all_seat_numbers' => $reservation->seat_numbers,
                 'expires_at' => $expiresAt
             ]);
 

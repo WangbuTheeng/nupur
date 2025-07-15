@@ -270,7 +270,7 @@ Route::get('/dashboard', function () {
 Route::get('/payment/esewa/success/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
 Route::get('/payment/esewa/failure/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
 
-// Test Payment Completion Route (for bypassing eSewa captcha issues)
+// Test Payment Completion Route (for bypassing eSewa issues) - TEMPORARILY ENABLED
 Route::get('/payment/test-complete/{booking}', [App\Http\Controllers\PaymentController::class, 'testComplete'])->name('payment.test.complete');
 
 Route::middleware('auth')->group(function () {
@@ -652,6 +652,86 @@ Route::get('/debug/esewa-params/{booking}', function (App\Models\Booking $bookin
         return response()->json(['error' => $result['message']], 400);
     }
 })->name('debug.esewa.params');
+
+// Debug eSewa configuration
+Route::get('/debug/esewa-config', function () {
+    return response()->json([
+        'merchant_id' => config('services.esewa.merchant_id'),
+        'base_url' => config('services.esewa.base_url'),
+        'payment_url' => config('services.esewa.payment_url'),
+        'status_check_url' => config('services.esewa.status_check_url'),
+        'success_url' => config('services.esewa.success_url'),
+        'failure_url' => config('services.esewa.failure_url'),
+        'secret_key_set' => !empty(config('services.esewa.secret_key')),
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.config');
+
+// Test eSewa signature generation
+Route::get('/debug/esewa-signature', function () {
+    // Test data from documentation
+    $testData = [
+        'total_amount' => 100,
+        'transaction_uuid' => '11-201-13',
+        'product_code' => 'EPAYTEST',
+        'signed_field_names' => 'total_amount,transaction_uuid,product_code'
+    ];
+
+    $message = sprintf('total_amount=%s,transaction_uuid=%s,product_code=%s',
+        $testData['total_amount'],
+        $testData['transaction_uuid'],
+        $testData['product_code']
+    );
+
+    $secretKey = config('services.esewa.secret_key');
+    $signature = hash_hmac('sha256', $message, $secretKey, true);
+    $signatureBase64 = base64_encode($signature);
+
+    return response()->json([
+        'message' => $message,
+        'signature' => $signatureBase64,
+        'expected_signature' => '4Ov7pCI1zIOdwtV2BRMUNjz1upIlT/COTxfLhWvVurE=',
+        'matches_expected' => $signatureBase64 === '4Ov7pCI1zIOdwtV2BRMUNjz1upIlT/COTxfLhWvVurE=',
+        'test_data' => $testData
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.signature');
+
+// Test eSewa URL accessibility
+Route::get('/debug/esewa-url-test', function () {
+    $paymentUrl = config('services.esewa.payment_url');
+
+    try {
+        $response = \Illuminate\Support\Facades\Http::timeout(10)->get($paymentUrl);
+
+        return response()->json([
+            'url' => $paymentUrl,
+            'status_code' => $response->status(),
+            'accessible' => $response->successful() || $response->status() === 405, // 405 Method Not Allowed is expected for GET on POST endpoint
+            'headers' => $response->headers(),
+            'body_preview' => substr($response->body(), 0, 500)
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'url' => $paymentUrl,
+            'error' => $e->getMessage(),
+            'accessible' => false
+        ], 200, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.esewa.url.test');
+
+// Test eSewa service accessibility
+Route::get('/debug/esewa-service-test', function () {
+    $esewaService = new \App\Services\EsewaPaymentService();
+
+    return response()->json([
+        'url_accessible' => $esewaService->testUrlAccessibility(),
+        'config' => [
+            'payment_url' => config('services.esewa.payment_url'),
+            'merchant_id' => config('services.esewa.merchant_id'),
+            'base_url' => config('services.esewa.base_url'),
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.service.test');
 
 // Test time-based booking restrictions
 Route::get('/test/time-restrictions/{scheduleId?}', function ($scheduleId = null) {

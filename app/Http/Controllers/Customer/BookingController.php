@@ -45,6 +45,13 @@ class BookingController extends Controller
 
         $bookings = $query->orderBy('created_at', 'desc')->paginate(10);
 
+        // Get active reservations
+        $reservations = SeatReservation::where('user_id', Auth::id())
+            ->with(['schedule.route', 'schedule.bus', 'schedule.operator'])
+            ->active()
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         // Statistics
         $stats = [
             'total' => Auth::user()->bookings()->count(),
@@ -57,9 +64,10 @@ class BookingController extends Controller
                 })
                 ->where('status', 'confirmed')
                 ->count(),
+            'reserved' => $reservations->count(),
         ];
 
-        return view('customer.bookings.index', compact('bookings', 'stats'));
+        return view('customer.bookings.index', compact('bookings', 'reservations', 'stats'));
     }
 
     /**
@@ -521,6 +529,90 @@ class BookingController extends Controller
             ->paginate(10);
 
         return view('customer.bookings.cancelled', compact('bookings'));
+    }
+
+    /**
+     * Show customer's active reservations.
+     */
+    public function reservations()
+    {
+        $reservations = SeatReservation::where('user_id', Auth::id())
+            ->with(['schedule.route', 'schedule.bus', 'schedule.operator'])
+            ->active()
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('customer.bookings.reservations', compact('reservations'));
+    }
+
+    /**
+     * Cancel a seat reservation.
+     */
+    public function cancelReservation(Request $request)
+    {
+        $request->validate([
+            'reservation_id' => 'required|exists:seat_reservations,id',
+        ]);
+
+        $reservation = SeatReservation::where('id', $request->reservation_id)
+            ->where('user_id', Auth::id())
+            ->active()
+            ->first();
+
+        if (!$reservation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reservation not found or already expired.',
+            ], 404);
+        }
+
+        try {
+            // Release the seats using the reservation service
+            $result = $this->reservationService->releaseSeats(Auth::id(), $reservation->schedule_id);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Reservation cancelled successfully.',
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'],
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error cancelling reservation', [
+                'reservation_id' => $reservation->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel reservation. Please try again.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Proceed with an existing reservation to passenger details.
+     */
+    public function proceedWithReservation(SeatReservation $reservation)
+    {
+        // Ensure user can only proceed with their own reservations
+        if ($reservation->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized access to reservation.');
+        }
+
+        // Check if reservation is still active
+        if (!$reservation->isActive()) {
+            return redirect()->route('customer.bookings.index')
+                ->with('error', 'Reservation has expired. Please make a new reservation.');
+        }
+
+        // Redirect to passenger details with the schedule
+        return redirect()->route('booking.passenger-details', $reservation->schedule);
     }
 
     /**

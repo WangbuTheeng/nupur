@@ -34,6 +34,46 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-10">
+        <!-- Existing Reservation Notice -->
+        @php
+            $existingReservation = \App\Models\SeatReservation::where('user_id', auth()->id())
+                ->where('schedule_id', $schedule->id)
+                ->active()
+                ->first();
+        @endphp
+
+        @if($existingReservation)
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-lg font-medium text-blue-900">
+                            You have seats reserved for this journey
+                        </h3>
+                        <div class="mt-2 text-blue-800">
+                            <p>Reserved seats: <strong>{{ implode(', ', $existingReservation->seat_numbers) }}</strong></p>
+                            <p class="text-sm">Expires: <strong>{{ $existingReservation->expires_at->format('M d, Y g:i A') }}</strong>
+                               (<span class="countdown" data-expires="{{ $existingReservation->expires_at->toISOString() }}">{{ $existingReservation->expires_at->diffForHumans() }}</span>)</p>
+                        </div>
+                        <div class="mt-4 flex space-x-3">
+                            <a href="{{ route('booking.passenger-details', $schedule) }}"
+                               class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                Complete Booking
+                            </a>
+                            <button onclick="cancelExistingReservation({{ $existingReservation->id }})"
+                                    class="bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors">
+                                Cancel & Select New Seats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Seat Map -->
             <div class="lg:col-span-2">
@@ -68,6 +108,15 @@
                     
                     <!-- Seat Map Container -->
                     <div id="seat-map-container" class="mb-6">
+                        <div class="text-center py-8">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading seat map...</p>
+                        </div>
+                        <!-- Real-time seat map will be loaded here -->
+                    </div>
+
+                    <!-- Hidden fallback for when JavaScript is disabled -->
+                    <noscript>
                         @if(isset($seatMap['seats']) && is_array($seatMap['seats']))
                             <div class="seat-map-container">
                                 <div class="bus-layout-container">
@@ -169,7 +218,7 @@
                                 <p class="text-gray-500">Seat map not available</p>
                             </div>
                         @endif
-                    </div>
+                    </noscript>
 
                     <!-- Selected Seats Info -->
                     <div class="p-4 bg-blue-50 rounded-xl">
@@ -177,7 +226,7 @@
                             No seats selected
                         </div>
                         <div class="text-sm text-blue-600 mt-1">
-                            Click on available seats to select them. Selected seats are reserved for 15 minutes.
+                            Click on available seats to select them. Selected seats are reserved for 1 hour.
                         </div>
                     </div>
                 </div>
@@ -449,16 +498,153 @@
 }
 </style>
 
+<!-- Include real-time seat map CSS and script -->
+<link rel="stylesheet" href="{{ asset('css/seat-map.css') }}">
+<script src="{{ asset('js/realtime-seat-map.js') }}"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const scheduleId = {{ $schedule->id }};
     const farePerSeat = {{ $schedule->fare }};
     let selectedSeats = [];
+    let realtimeSeatMap;
 
     console.log('🚌 [SEAT-SELECTION] Page loaded for schedule:', scheduleId);
     console.log('🚌 [SEAT-SELECTION] Fare per seat:', farePerSeat);
 
-    // Handle seat selection for all available seats
+    // Initialize real-time seat map
+    initializeRealtimeSeatMap();
+
+    // Function to initialize real-time seat map
+    function initializeRealtimeSeatMap() {
+        // Create a custom real-time seat map for seat selection
+        realtimeSeatMap = new RealtimeSeatMap(scheduleId, 'seat-map-container');
+
+        // Override the seat click handler to integrate with our booking flow
+        realtimeSeatMap.handleSeatClick = function(seatElement) {
+            const seatNumber = seatElement.dataset.seat || seatElement.dataset.seatNumber;
+
+            // Don't allow selection of booked seats
+            if (seatElement.classList.contains('booked')) {
+                return;
+            }
+
+            // Allow selection of seats reserved by current user, but not by others
+            if (seatElement.classList.contains('reserved')) {
+                // Check if this seat is reserved by current user
+                @if($existingReservation)
+                    const userReservedSeats = @json($existingReservation->seat_numbers);
+                    if (!userReservedSeats.includes(parseInt(seatNumber))) {
+                        // This seat is reserved by someone else
+                        return;
+                    }
+                @else
+                    // No existing reservation, so this must be reserved by someone else
+                    return;
+                @endif
+            }
+
+            if (selectedSeats.includes(seatNumber)) {
+                // Deselect seat
+                selectedSeats = selectedSeats.filter(s => s !== seatNumber);
+                seatElement.classList.remove('selected');
+
+                // If this seat was originally reserved by user, mark it as reserved again
+                @if($existingReservation)
+                    const userReservedSeats = @json($existingReservation->seat_numbers);
+                    if (userReservedSeats.includes(parseInt(seatNumber))) {
+                        seatElement.classList.add('reserved');
+                    } else {
+                        seatElement.classList.add('available');
+                    }
+                @else
+                    seatElement.classList.add('available');
+                @endif
+
+                console.log('🪑 [SEAT-DESELECT] Seat deselected:', seatNumber);
+            } else {
+                // Select seat (max 10 seats total including existing reservations)
+                @if($existingReservation)
+                    const userReservedSeats = @json($existingReservation->seat_numbers);
+                    const totalSeats = selectedSeats.length + userReservedSeats.length;
+                @else
+                    const totalSeats = selectedSeats.length;
+                @endif
+
+                if (totalSeats < 10) {
+                    selectedSeats.push(seatNumber);
+                    seatElement.classList.remove('available', 'reserved');
+                    seatElement.classList.add('selected');
+                    console.log('🪑 [SEAT-SELECT] Seat selected:', seatNumber);
+                } else {
+                    alert('You can reserve maximum 10 seats total.');
+                    return;
+                }
+            }
+
+            console.log('🪑 [SEAT-SELECTION] Current selection:', selectedSeats);
+            updateBookingSummary();
+        };
+
+        // Set up seat click handlers after seat map is loaded
+        setTimeout(() => {
+            setupSeatClickHandlers();
+            console.log('🚌 [REALTIME-SEAT-MAP] Seat map loaded and click handlers set up');
+        }, 1000);
+
+        // Refresh seat map every 30 seconds to ensure we have latest data
+        setInterval(() => {
+            if (realtimeSeatMap) {
+                realtimeSeatMap.loadSeatMap();
+            }
+        }, 30000);
+    }
+
+    // Initialize booking summary on page load
+    updateBookingSummary();
+
+    function setupSeatClickHandlers() {
+        document.querySelectorAll('.seat').forEach(seat => {
+            // Only add click handler to available seats
+            if (!seat.classList.contains('booked') && !seat.classList.contains('reserved')) {
+                seat.addEventListener('click', function() {
+                    if (realtimeSeatMap && realtimeSeatMap.handleSeatClick) {
+                        realtimeSeatMap.handleSeatClick(this);
+                    } else {
+                        // Fallback to original seat click handling
+                        handleSeatClickFallback(this);
+                    }
+                });
+            }
+        });
+    }
+
+    function handleSeatClickFallback(seatElement) {
+        const seatNumber = seatElement.dataset.seat || seatElement.dataset.seatNumber;
+
+        if (!seatNumber) return;
+
+        if (selectedSeats.includes(seatNumber)) {
+            // Deselect seat
+            selectedSeats = selectedSeats.filter(s => s !== seatNumber);
+            seatElement.classList.remove('seat-selected', 'selected');
+            seatElement.classList.add('seat-available', 'available');
+        } else {
+            // Select seat (max 10 seats)
+            if (selectedSeats.length < 10) {
+                selectedSeats.push(seatNumber);
+                seatElement.classList.remove('seat-available', 'available');
+                seatElement.classList.add('seat-selected', 'selected');
+            } else {
+                alert('You can select maximum 10 seats at a time.');
+                return;
+            }
+        }
+
+        updateBookingSummary();
+    }
+
+    // Handle seat selection for all available seats (fallback for static seats)
     document.querySelectorAll('.seat').forEach(seat => {
         // Only add click handler to available seats
         if (seat.dataset.isAvailable === 'true' && !seat.classList.contains('seat-booked')) {
@@ -492,52 +678,97 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function updateBookingSummary() {
-        const count = selectedSeats.length;
-        const subtotal = count * farePerSeat;
-        
+        @if($existingReservation)
+            const existingSeats = @json($existingReservation->seat_numbers);
+            const existingCount = existingSeats.length;
+        @else
+            const existingSeats = [];
+            const existingCount = 0;
+        @endif
+
+        const newCount = selectedSeats.length;
+        const totalCount = existingCount + newCount;
+        const newSubtotal = newCount * farePerSeat;
+        const existingSubtotal = existingCount * farePerSeat;
+        const totalSubtotal = totalCount * farePerSeat;
+
         // Update displays
-        document.getElementById('seat-count').textContent = count;
-        document.getElementById('subtotal').textContent = 'Rs. ' + subtotal.toLocaleString();
-        document.getElementById('total-amount').textContent = 'Rs. ' + subtotal.toLocaleString();
-        
+        document.getElementById('seat-count').textContent = totalCount;
+        document.getElementById('subtotal').textContent = 'Rs. ' + totalSubtotal.toLocaleString();
+        document.getElementById('total-amount').textContent = 'Rs. ' + totalSubtotal.toLocaleString();
+
         // Update selected seats display
         const selectedSeatsDisplay = document.getElementById('selected-seats-display');
         const selectedSeatsList = document.getElementById('selected-seats-list');
-        
-        if (count > 0) {
-            selectedSeatsDisplay.textContent = `${count} seat(s) selected: ${selectedSeats.join(', ')}`;
-            selectedSeatsList.innerHTML = selectedSeats.map(seat => 
+
+        let displayText = '';
+        let listHTML = '';
+
+        if (existingCount > 0 && newCount > 0) {
+            displayText = `${totalCount} seat(s) total: ${existingCount} reserved + ${newCount} selected`;
+
+            // Show existing reservations
+            listHTML += existingSeats.map(seat =>
+                `<div class="flex justify-between items-center p-2 bg-blue-50 rounded">
+                    <span>Seat ${seat} <span class="text-xs text-blue-600">(Reserved)</span></span>
+                    <span class="font-medium">Rs. ${farePerSeat.toLocaleString()}</span>
+                </div>`
+            ).join('');
+
+            // Show new selections
+            listHTML += selectedSeats.map(seat =>
+                `<div class="flex justify-between items-center p-2 bg-yellow-50 rounded">
+                    <span>Seat ${seat} <span class="text-xs text-yellow-600">(Selected)</span></span>
+                    <span class="font-medium">Rs. ${farePerSeat.toLocaleString()}</span>
+                </div>`
+            ).join('');
+        } else if (existingCount > 0) {
+            displayText = `${existingCount} seat(s) reserved: ${existingSeats.join(', ')}`;
+            listHTML = existingSeats.map(seat =>
+                `<div class="flex justify-between items-center p-2 bg-blue-50 rounded">
+                    <span>Seat ${seat} <span class="text-xs text-blue-600">(Reserved)</span></span>
+                    <span class="font-medium">Rs. ${farePerSeat.toLocaleString()}</span>
+                </div>`
+            ).join('');
+        } else if (newCount > 0) {
+            displayText = `${newCount} seat(s) selected: ${selectedSeats.join(', ')}`;
+            listHTML = selectedSeats.map(seat =>
                 `<div class="flex justify-between items-center p-2 bg-yellow-50 rounded">
                     <span>Seat ${seat}</span>
                     <span class="font-medium">Rs. ${farePerSeat.toLocaleString()}</span>
                 </div>`
             ).join('');
         } else {
-            selectedSeatsDisplay.textContent = 'No seats selected';
-            selectedSeatsList.innerHTML = '<div class="text-gray-500 text-sm">No seats selected</div>';
+            displayText = 'No seats selected';
+            listHTML = '<div class="text-gray-500 text-sm">No seats selected</div>';
         }
+
+        selectedSeatsDisplay.textContent = displayText;
+        selectedSeatsList.innerHTML = listHTML;
         
         // Update buttons
         const reserveButton = document.getElementById('reserve-button');
         const proceedButton = document.getElementById('proceed-button');
 
-        if (count > 0) {
-            // Enable reserve button
+        // Reserve button: Enable if there are new seats to reserve
+        if (newCount > 0) {
             reserveButton.disabled = false;
             reserveButton.className = 'w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-blue-700';
             reserveButton.onclick = reserveSeats;
+            reserveButton.innerHTML = `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Reserve ${newCount} More Seat${newCount > 1 ? 's' : ''} (1 hour)`;
+        } else {
+            reserveButton.disabled = true;
+            reserveButton.className = 'w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed';
+            reserveButton.onclick = null;
+            reserveButton.innerHTML = `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Reserve Seats (1 hour)`;
+        }
 
-            // Enable proceed button
+        // Proceed button: Enable if there are any seats (existing or new)
+        if (totalCount > 0) {
             proceedButton.disabled = false;
             proceedButton.className = 'w-full bg-green-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 hover:bg-green-700';
             proceedButton.onclick = proceedToPassengerDetails;
         } else {
-            // Disable reserve button
-            reserveButton.disabled = true;
-            reserveButton.className = 'w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed';
-            reserveButton.onclick = null;
-
-            // Disable proceed button
             proceedButton.disabled = true;
             proceedButton.className = 'w-full bg-gray-300 text-gray-500 px-6 py-4 rounded-xl font-semibold transition-all duration-200 cursor-not-allowed';
             proceedButton.onclick = null;
@@ -571,18 +802,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 alert(`Seats ${selectedSeats.join(', ')} have been reserved for 1 hour. You can proceed to book them anytime within this period.`);
 
-                // Update seat colors to blue (reserved)
-                selectedSeats.forEach(seatNumber => {
-                    const seatElement = document.querySelector(`[data-seat-number="${seatNumber}"]`);
-                    if (seatElement) {
-                        seatElement.classList.remove('seat-selected');
-                        seatElement.classList.add('seat-reserved');
-                        seatElement.style.background = '#3b82f6';
-                        seatElement.style.borderColor = '#1d4ed8';
-                        seatElement.style.cursor = 'not-allowed';
-                        seatElement.onclick = null;
-                    }
-                });
+                // Refresh the real-time seat map to show updated reservations
+                if (realtimeSeatMap) {
+                    realtimeSeatMap.loadSeatMap();
+                } else {
+                    // Fallback: Update seat colors manually for static seat map
+                    selectedSeats.forEach(seatNumber => {
+                        const seatElement = document.querySelector(`[data-seat-number="${seatNumber}"], [data-seat="${seatNumber}"]`);
+                        if (seatElement) {
+                            seatElement.classList.remove('seat-selected', 'selected');
+                            seatElement.classList.add('seat-reserved', 'reserved');
+                            seatElement.style.background = '#3b82f6';
+                            seatElement.style.borderColor = '#1d4ed8';
+                            seatElement.style.cursor = 'not-allowed';
+                            seatElement.onclick = null;
+                        }
+                    });
+                }
 
                 // Clear selection
                 selectedSeats = [];
@@ -603,6 +839,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function proceedToPassengerDetails() {
+        @if($existingReservation)
+            const existingSeats = @json($existingReservation->seat_numbers);
+            const hasExistingReservation = true;
+        @else
+            const existingSeats = [];
+            const hasExistingReservation = false;
+        @endif
+
+        // If user has existing reservation and no new seats selected, proceed directly
+        if (hasExistingReservation && selectedSeats.length === 0) {
+            console.log('🚀 [PROCEED] Proceeding with existing reservation:', existingSeats);
+            window.location.href = '{{ route("booking.passenger-details", $schedule) }}';
+            return;
+        }
+
+        // If user has new seats selected, reserve them first
         if (selectedSeats.length === 0) {
             console.log('❌ [PROCEED] No seats selected');
             return;
@@ -610,7 +862,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.log('🚀 [PROCEED] Proceeding to passenger details with seats:', selectedSeats);
 
-        // Reserve seats via AJAX
+        // Reserve new seats via AJAX
         fetch('{{ route("booking.reserve-seats") }}', {
             method: 'POST',
             headers: {
@@ -632,11 +884,65 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Seat reservation error:', error);
-            reserveButton.disabled = false;
-            reserveButton.innerHTML = originalText;
             alert('An error occurred while reserving seats. Please try again.');
         });
     }
+
+    // Update countdown timer for existing reservation
+    function updateCountdown() {
+        const countdownElement = document.querySelector('.countdown');
+        if (countdownElement) {
+            const expiresAt = new Date(countdownElement.dataset.expires);
+            const now = new Date();
+            const diff = expiresAt - now;
+
+            if (diff <= 0) {
+                countdownElement.textContent = 'Expired';
+                // Reload page to refresh expired reservation
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                countdownElement.textContent = `${minutes}m ${seconds}s remaining`;
+            }
+        }
+    }
+
+    // Update countdown every second if there's an existing reservation
+    if (document.querySelector('.countdown')) {
+        setInterval(updateCountdown, 1000);
+        updateCountdown(); // Initial call
+    }
 });
+
+// Cancel existing reservation function (outside DOMContentLoaded)
+function cancelExistingReservation(reservationId) {
+    if (!confirm('Are you sure you want to cancel your current reservation? Your seats will be released and you can select new ones.')) {
+        return;
+    }
+
+    fetch('{{ route("customer.bookings.cancel-reservation") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            reservation_id: reservationId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to show updated seat map
+        } else {
+            alert(data.message || 'Failed to cancel reservation. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to cancel reservation. Please try again.');
+    });
+}
 </script>
 @endsection

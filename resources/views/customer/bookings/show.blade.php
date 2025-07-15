@@ -206,7 +206,7 @@
                                 Proceed with Payment
                             </a>
 
-                            <!-- Test Payment Completion Button (for bypassing eSewa captcha issues) -->
+                            <!-- Temporary Test Payment (while fixing eSewa) -->
                             <a href="{{ route('payment.test.complete', $booking) }}"
                                class="w-full bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 font-semibold transition-colors text-center block mt-3"
                                onclick="return confirm('This will complete the payment in test mode. Are you sure?')">
@@ -215,6 +215,10 @@
                                 </svg>
                                 Complete Payment (Test Mode)
                             </a>
+
+
+
+
 
                             <button id="cancel-booking-btn" class="w-full bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700 font-semibold transition-colors">
                                 <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

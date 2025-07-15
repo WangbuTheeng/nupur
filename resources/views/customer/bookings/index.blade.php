@@ -20,28 +20,37 @@
         <!-- Filter Tabs -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-8">
             <div class="flex flex-wrap gap-4 justify-center">
-                <a href="{{ route('customer.bookings.index') }}" 
-                   class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ !request('status') ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600' }}">
+                <a href="{{ route('customer.bookings.index') }}"
+                   class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ !request('status') && !request()->is('*/reservations') ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600' }}">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
                     All Bookings
                 </a>
-                <a href="{{ route('customer.bookings.index', ['status' => 'confirmed']) }}" 
+                @if($stats['reserved'] > 0)
+                <a href="{{ route('customer.bookings.reservations') }}"
+                   class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ request()->is('*/reservations') ? 'bg-purple-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-purple-50 hover:text-purple-600' }}">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Reserved Seats ({{ $stats['reserved'] }})
+                </a>
+                @endif
+                <a href="{{ route('customer.bookings.index', ['status' => 'confirmed']) }}"
                    class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ request('status') === 'confirmed' ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600' }}">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     Confirmed
                 </a>
-                <a href="{{ route('customer.bookings.index', ['status' => 'pending']) }}" 
+                <a href="{{ route('customer.bookings.index', ['status' => 'pending']) }}"
                    class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ request('status') === 'pending' ? 'bg-yellow-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-yellow-50 hover:text-yellow-600' }}">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     Pending
                 </a>
-                <a href="{{ route('customer.bookings.index', ['status' => 'cancelled']) }}" 
+                <a href="{{ route('customer.bookings.index', ['status' => 'cancelled']) }}"
                    class="px-6 py-3 rounded-xl font-semibold transition-all duration-200 {{ request('status') === 'cancelled' ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' }}">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -50,6 +59,33 @@
                 </a>
             </div>
         </div>
+
+        <!-- Active Reservations Alert -->
+        @if(isset($reservations) && $reservations->count() > 0)
+            <div class="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-8">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-lg font-medium text-orange-900">
+                            You have {{ $reservations->count() }} active seat reservation{{ $reservations->count() > 1 ? 's' : '' }}
+                        </h3>
+                        <div class="mt-2 text-orange-800">
+                            <p>Complete your booking before {{ $reservations->first()->expires_at->format('M d, Y g:i A') }} or your seats will be released.</p>
+                        </div>
+                        <div class="mt-4">
+                            <a href="{{ route('customer.bookings.reservations') }}"
+                               class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors">
+                                View Reserved Seats
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <!-- Bookings List -->
         @if($bookings->count() > 0)

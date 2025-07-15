@@ -114,26 +114,7 @@
                 </button>
             </div>
 
-            <!-- Demo Payment (for testing) -->
-            <div class="border border-gray-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center mb-3">
-                    <div class="w-12 h-8 bg-green-600 rounded flex items-center justify-center">
-                        <span class="text-white text-xs font-bold">Demo</span>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="font-medium text-gray-900">Demo Payment</h3>
-                        <p class="text-sm text-gray-600">For testing purposes only</p>
-                    </div>
-                </div>
-                
-                <form action="{{ route('bookings.payment.demo', $booking) }}" method="POST">
-                    @csrf
-                    <button type="submit" 
-                            class="w-full bg-green-600 text-white hover:bg-green-700 px-4 py-3 rounded-md font-semibold transition duration-200">
-                        Complete Demo Payment
-                    </button>
-                </form>
-            </div>
+
 
             <!-- Payment Security Info -->
             <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">

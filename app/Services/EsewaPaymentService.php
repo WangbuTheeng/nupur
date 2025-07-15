@@ -30,11 +30,42 @@ class EsewaPaymentService
     }
 
     /**
-     * Initiate payment with eSewa v2 API
+     * Test if eSewa URL is accessible
+     */
+    public function testUrlAccessibility()
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(5)->get($this->paymentUrl);
+            return $response->successful() || $response->status() === 405; // 405 is expected for GET on POST endpoint
+        } catch (\Exception $e) {
+            Log::warning('eSewa URL accessibility test failed', [
+                'url' => $this->paymentUrl,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Initiate payment with eSewa (with multiple fallback options)
      */
     public function initiatePayment(Booking $booking, array $additionalData = [])
     {
         try {
+            // Test URL accessibility first
+            if (!$this->testUrlAccessibility()) {
+                Log::warning('eSewa URL not accessible, payment may fail', [
+                    'url' => $this->paymentUrl,
+                    'booking_id' => $booking->id
+                ]);
+
+                return [
+                    'success' => false,
+                    'message' => 'eSewa payment gateway is currently unavailable. Please try again later or use the test payment option.',
+                    'error_code' => 'ESEWA_UNAVAILABLE'
+                ];
+            }
+
             // Create payment record
             $payment = Payment::create([
                 'booking_id' => $booking->id,
@@ -55,21 +86,21 @@ class EsewaPaymentService
             $deliveryCharge = 0; // No delivery charge for now
             $totalAmount = $amount + $taxAmount + $serviceCharge + $deliveryCharge;
 
+            // Use eSewa v1 API format as fallback
             $paymentData = [
-                'amount' => $amount,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
-                'transaction_uuid' => $payment->transaction_id,
-                'product_code' => $this->merchantId,
-                'product_service_charge' => $serviceCharge,
-                'product_delivery_charge' => $deliveryCharge,
-                'success_url' => $this->successUrl . '/' . $payment->id,
-                'failure_url' => $this->failureUrl . '/' . $payment->id,
-                'signed_field_names' => 'total_amount,transaction_uuid,product_code',
+                'amt' => $amount,
+                'txAmt' => $taxAmount,
+                'tAmt' => $totalAmount,
+                'pid' => $payment->transaction_id,
+                'scd' => $this->merchantId,
+                'psc' => $serviceCharge,
+                'pdc' => $deliveryCharge,
+                'su' => $this->successUrl . '/' . $payment->id,
+                'fu' => $this->failureUrl . '/' . $payment->id,
             ];
 
-            // Generate signature
-            $paymentData['signature'] = $this->generateSignature($paymentData);
+            // v1 API doesn't use signatures
+            // $paymentData['signature'] = $this->generateSignature($paymentData);
 
             // Log payment data for debugging
             Log::info('eSewa Payment Initiation', [
@@ -289,7 +320,7 @@ class EsewaPaymentService
     private function generateSignature($paymentData)
     {
         try {
-            // eSewa v2 signature format: total_amount,transaction_uuid,product_code
+            // eSewa v2 signature format: total_amount=value,transaction_uuid=value,product_code=value
             $message = sprintf(
                 'total_amount=%s,transaction_uuid=%s,product_code=%s',
                 $paymentData['total_amount'],
@@ -381,7 +412,7 @@ class EsewaPaymentService
     }
 
     /**
-     * Generate payment form HTML for eSewa v2 API
+     * Generate payment form HTML for eSewa v1 API (fallback)
      */
     private function generatePaymentForm($paymentData)
     {
@@ -393,7 +424,12 @@ class EsewaPaymentService
         return '
         <form id="esewa-payment-form" action="' . $this->paymentUrl . '" method="POST">
             ' . $formFields . '
-            <button type="submit" class="btn btn-primary">Pay with eSewa</button>
+            <button type="submit" class="w-full bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 font-semibold transition-colors">
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                Pay with eSewa
+            </button>
         </form>';
     }
 

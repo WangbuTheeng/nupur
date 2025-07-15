@@ -39,8 +39,11 @@ Route::middleware(['auth', 'user'])->group(function () {
         Route::get('/', [BookingController::class, 'index'])->name('index');
         Route::get('/upcoming', [BookingController::class, 'upcoming'])->name('upcoming');
         Route::get('/history', [BookingController::class, 'history'])->name('history');
+        Route::get('/reservations', [BookingController::class, 'reservations'])->name('reservations');
         Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
         Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
+        Route::post('/cancel-reservation', [BookingController::class, 'cancelReservation'])->name('cancel-reservation');
+        Route::get('/proceed-reservation/{reservation}', [BookingController::class, 'proceedWithReservation'])->name('proceed-reservation');
     });
 
     // Customer Tickets
