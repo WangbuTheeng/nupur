@@ -587,6 +587,60 @@ Route::get('/fix/all-buses-duplicates', function () {
     ], JSON_PRETTY_PRINT);
 });
 
+// Test email configuration
+Route::get('/test/email', function () {
+    try {
+        Mail::raw('Test email from BookNGO - Email configuration is working!', function($message) {
+            $message->to('wangbutamang22@gmail.com')
+                   ->subject('BookNGO Email Test - ' . now());
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Test email sent successfully! Check your email inbox.',
+            'config' => [
+                'mailer' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'from' => config('mail.from.address')
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Email sending failed: ' . $e->getMessage(),
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->name('test.email');
+
+// Simple test email route
+Route::get('/test/simple-email', function () {
+    try {
+        $result = Mail::raw('Simple test email', function($message) {
+            $message->to('wangbutamang22@gmail.com')->subject('Simple Test');
+        });
+
+        return 'Email sent successfully! Result: ' . ($result ? 'true' : 'false');
+    } catch (\Exception $e) {
+        return 'Email failed: ' . $e->getMessage();
+    }
+});
+
+// Debug eSewa payment parameters
+Route::get('/debug/esewa-params/{booking}', function (App\Models\Booking $booking) {
+    $esewaService = new App\Services\EsewaPaymentService();
+    $result = $esewaService->initiatePayment($booking);
+
+    if ($result['success']) {
+        return response()->json([
+            'payment_data' => $result['payment_data'],
+            'form_html' => $result['form_html']
+        ], 200, [], JSON_PRETTY_PRINT);
+    } else {
+        return response()->json(['error' => $result['message']], 400);
+    }
+})->name('debug.esewa.params');
+
 // Test time-based booking restrictions
 Route::get('/test/time-restrictions/{scheduleId?}', function ($scheduleId = null) {
     if ($scheduleId) {

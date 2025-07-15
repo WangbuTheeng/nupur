@@ -149,6 +149,20 @@
             color: #2563eb;
             text-decoration: none;
         }
+        .compact-ticket {
+            border: 2px solid #333;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            background: #fff;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .ticket-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -168,6 +182,10 @@
                 transform: rotate(90deg);
                 margin: 5px 0;
             }
+            .ticket-flex {
+                flex-direction: column;
+                gap: 5px;
+            }
         }
     </style>
 </head>
@@ -181,50 +199,57 @@
 
         <!-- Greeting -->
         <h2 style="color: #1e293b; margin-bottom: 20px;">Hello {{ $booking->user->name }},</h2>
-        
-        <p>Thank you for booking with BookNGO! Your e-ticket is attached to this email as a PDF file.</p>
 
-        <!-- Booking Reference -->
-        <div class="booking-ref">
-            <div class="booking-ref-label">Booking Reference</div>
-            <div class="booking-ref-number">{{ $booking->booking_reference }}</div>
-        </div>
+        <p>Thank you for booking with BookNGO! Here is your e-ticket:</p>
 
-        <!-- Journey Details -->
-        <div class="journey-details">
-            <div class="journey-header">Journey Details</div>
-            
-            <div class="route">
-                <span>{{ $booking->schedule->route->sourceCity->name }}</span>
-                <span class="route-arrow">→</span>
-                <span>{{ $booking->schedule->route->destinationCity->name }}</span>
+        <!-- Compact Ticket -->
+        <div class="compact-ticket">
+            <!-- Ticket Header -->
+            <div style="text-align: center; padding: 15px; border-bottom: 1px solid #333;">
+                <div style="font-size: 24px; font-weight: bold; color: #2563eb; margin-bottom: 5px;">BookNGO</div>
+                <div style="font-size: 14px; color: #666;">Bus Ticket</div>
             </div>
 
-            <div class="details-grid">
-                <div class="detail-item">
-                    <div class="detail-label">Travel Date</div>
-                    <div class="detail-value">{{ $booking->schedule->travel_date->format('M d, Y') }}</div>
+            <!-- Booking Reference -->
+            <div style="text-align: center; padding: 10px; border-bottom: 1px solid #333; background: #f8f9fa;">
+                <div style="font-size: 20px; font-weight: bold; color: #333;">{{ $booking->booking_reference }}</div>
+            </div>
+
+            <!-- Journey Info -->
+            <div style="padding: 15px; border-bottom: 1px solid #333;">
+                <div class="ticket-flex" style="margin-bottom: 10px;">
+                    <span style="font-weight: bold;">{{ $booking->schedule->route->sourceCity->name }}</span>
+                    <span style="color: #666;">→</span>
+                    <span style="font-weight: bold;">{{ $booking->schedule->route->destinationCity->name }}</span>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Departure Time</div>
-                    <div class="detail-value">{{ $booking->schedule->departure_time->format('h:i A') }}</div>
+                <div class="ticket-flex" style="font-size: 14px;">
+                    <span>{{ $booking->schedule->travel_date->format('M d, Y') }}</span>
+                    <span>{{ $booking->schedule->departure_time->format('H:i') }}</span>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Passengers</div>
-                    <div class="detail-value">{{ $booking->passenger_count }}</div>
+                <div style="margin-top: 10px; font-size: 14px;">
+                    <strong>Bus:</strong> {{ $booking->schedule->bus->bus_number }}
+                    <span style="margin-left: 20px;"><strong>Seats:</strong> {{ implode(', ', $booking->seat_numbers) }}</span>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Seat Numbers</div>
-                    <div class="detail-value">{{ implode(', ', $booking->seat_numbers) }}</div>
+            </div>
+
+            <!-- Passenger Details -->
+            <div style="padding: 15px; border-bottom: 1px solid #333;">
+                @foreach($booking->passenger_details as $index => $passenger)
+                <div style="margin-bottom: 8px; font-size: 14px;">
+                    <strong>Seat {{ $booking->seat_numbers[$index] ?? ($index + 1) }}:</strong> {{ $passenger['name'] }} ({{ $passenger['age'] }}/{{ strtoupper(substr($passenger['gender'], 0, 1)) }})
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Bus Number</div>
-                    <div class="detail-value">{{ $booking->schedule->bus->bus_number }}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Total Amount</div>
-                    <div class="detail-value">NPR {{ number_format($booking->total_amount, 2) }}</div>
-                </div>
+                @endforeach
+            </div>
+
+            <!-- Total Amount -->
+            <div style="padding: 15px; text-align: center; background: #f8f9fa;">
+                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Total: NPR {{ number_format($booking->total_amount, 0) }}</div>
+                <div style="font-size: 16px; font-weight: bold; color: #28a745;">{{ ucfirst($booking->status) }}</div>
+            </div>
+
+            <!-- Instructions -->
+            <div style="padding: 10px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #333;">
+                Show this ticket to conductor
             </div>
         </div>
 
