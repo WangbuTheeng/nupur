@@ -258,6 +258,9 @@ Route::get('/dashboard', function () {
 Route::get('/payment/esewa/success/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
 Route::get('/payment/esewa/failure/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
 
+// Test Payment Completion Route (for bypassing eSewa captcha issues)
+Route::get('/payment/test-complete/{booking}', [App\Http\Controllers\PaymentController::class, 'testComplete'])->name('payment.test.complete');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

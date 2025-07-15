@@ -4,7 +4,7 @@
 eSewa ID & Password:
 To make payment with eSewa sdk. One must be a registered eSewa user. For testing phase, the client/merchant can use the following eSewa id and password:
 
-eSewa ID: 9806800001/2/3/4/5
+ 
 Password: Nepal@123
 MPIN: 1122 (for application only)
 Merchant ID/Service Code: EPAYTEST

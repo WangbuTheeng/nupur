@@ -119,7 +119,7 @@ document.addEventListener('visibilitychange', function() {
     if (!document.hidden) {
         // User came back to the page, check payment status
         setTimeout(function() {
-            window.location.href = '{{ route("booking.show", $booking) }}';
+            window.location.href = '{{ route("bookings.show", $booking) }}';
         }, 2000);
     }
 });

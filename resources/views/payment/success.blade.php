@@ -88,7 +88,7 @@
                                     Go to Dashboard
                                 </a>
                                 @if(isset($booking))
-                                    <a href="{{ route('booking.show', $booking) }}" 
+                                    <a href="{{ route('bookings.show', $booking) }}"
                                        class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <i class="fas fa-ticket-alt mr-2"></i>
                                         View Booking

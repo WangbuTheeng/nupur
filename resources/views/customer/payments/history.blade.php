@@ -29,11 +29,11 @@
                                     <div class="flex items-start justify-between mb-4">
                                         <div>
                                             <h3 class="text-2xl font-bold text-gray-900 mb-2">
-                                                {{ $payment->schedule->route->full_name }}
+                                                {{ $payment->booking->schedule->route->full_name }}
                                             </h3>
                                             <div class="flex items-center space-x-4 text-sm text-gray-500">
                                                 <span class="bg-gray-100 px-3 py-1 rounded-lg font-medium">
-                                                    {{ $payment->booking_reference }}
+                                                    {{ $payment->booking->booking_reference }}
                                                 </span>
                                                 <span>{{ $payment->created_at->format('M d, Y') }}</span>
                                             </div>
@@ -54,7 +54,7 @@
                                             </svg>
                                             <div>
                                                 <p class="text-xs text-gray-500 font-medium">Travel Date</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ $payment->schedule->travel_date->format('M d, Y') }}</p>
+                                                <p class="text-sm font-semibold text-gray-900">{{ $payment->booking->schedule->travel_date->format('M d, Y') }}</p>
                                             </div>
                                         </div>
                                         <div class="flex items-center">
@@ -73,7 +73,7 @@
                                             </svg>
                                             <div>
                                                 <p class="text-xs text-gray-500 font-medium">Seats</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ implode(', ', $payment->seat_numbers) }}</p>
+                                                <p class="text-sm font-semibold text-gray-900">{{ implode(', ', json_decode($payment->booking->seat_numbers)) }}</p>
                                             </div>
                                         </div>
                                         <div class="flex items-center">
@@ -90,13 +90,13 @@
 
                                 <!-- Amount and Actions -->
                                 <div class="flex flex-col lg:items-end lg:text-right">
-                                    <p class="text-3xl font-bold text-gray-900 mb-6">Rs. {{ number_format($payment->total_amount) }}</p>
+                                    <p class="text-3xl font-bold text-gray-900 mb-6">Rs. {{ number_format($payment->amount) }}</p>
                                     <div class="flex flex-col sm:flex-row lg:flex-col space-y-3 sm:space-y-0 sm:space-x-3 lg:space-x-0 lg:space-y-3">
-                                        <a href="{{ route('customer.bookings.show', $payment) }}" 
+                                        <a href="{{ route('customer.bookings.show', $payment->booking) }}"
                                            class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 text-sm font-semibold transition-colors text-center">
                                             View Booking
                                         </a>
-                                        <a href="{{ route('customer.tickets.show', $payment) }}" 
+                                        <a href="{{ route('customer.tickets.show', $payment->booking) }}"
                                            class="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 text-sm font-semibold transition-colors text-center">
                                             Download Ticket
                                         </a>

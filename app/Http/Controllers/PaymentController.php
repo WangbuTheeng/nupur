@@ -30,7 +30,7 @@ class PaymentController extends Controller
 
         // Check if booking is already paid
         if ($booking->payment_status === 'paid') {
-            return redirect()->route('booking.show', $booking)
+            return redirect()->route('bookings.show', $booking)
                 ->with('info', 'This booking has already been paid.');
         }
 
@@ -50,7 +50,7 @@ class PaymentController extends Controller
 
             // Check if booking is already paid
             if ($booking->payment_status === 'paid') {
-                return redirect()->route('booking.show', $booking)
+                return redirect()->route('bookings.show', $booking)
                     ->with('info', 'This booking has already been paid.');
             }
 
@@ -145,8 +145,8 @@ class PaymentController extends Controller
             if ($verificationResult['success']) {
                 $booking = $payment->booking;
 
-                // Redirect to ticket page for successful payment
-                return redirect()->route('customer.tickets.show', $booking)
+                // Redirect to payment success page
+                return redirect()->route('payment.success', $booking)
                     ->with('success', 'Payment completed successfully! Your ticket is ready.');
             } else {
                 // Payment verification failed
@@ -222,7 +222,13 @@ class PaymentController extends Controller
     public function paymentHistory()
     {
         $payments = Payment::where('user_id', Auth::id())
-            ->with('booking.schedule.route')
+            ->with([
+                'booking.schedule.route.sourceCity',
+                'booking.schedule.route.destinationCity',
+                'booking.schedule.bus',
+                'booking.schedule.operator'
+            ])
+            ->where('status', 'completed')
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
@@ -283,6 +289,59 @@ class PaymentController extends Controller
                 'success' => false,
                 'message' => 'Failed to check eSewa payment status'
             ], 500);
+        }
+    }
+
+    /**
+     * Test payment completion (bypasses eSewa for testing)
+     */
+    public function testComplete(Booking $booking)
+    {
+        // Find the latest pending payment for this booking
+        $payment = $booking->payments()->where('status', 'pending')->latest()->first();
+
+        if (!$payment) {
+            return redirect()->route('bookings.show', $booking)
+                ->with('error', 'No pending payment found for this booking.');
+        }
+
+        try {
+            // Mark payment as completed
+            $payment->update([
+                'status' => 'completed',
+                'gateway_transaction_id' => 'TEST-' . now()->format('YmdHis'),
+                'gateway_response' => json_encode([
+                    'test_payment' => true,
+                    'completed_at' => now(),
+                    'note' => 'Test payment completion bypassing eSewa captcha'
+                ]),
+                'paid_at' => now()
+            ]);
+
+            // Update booking status
+            $booking->update([
+                'status' => 'confirmed',
+                'payment_status' => 'paid'
+            ]);
+
+            Log::info('Test Payment Completed', [
+                'booking_id' => $booking->id,
+                'payment_id' => $payment->id,
+                'amount' => $payment->amount
+            ]);
+
+            return redirect()->route('customer.tickets.show', $booking)
+                ->with('success', 'Payment completed successfully! (Test Mode)');
+
+        } catch (\Exception $e) {
+            Log::error('Test Payment Completion Error', [
+                'booking_id' => $booking->id,
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('bookings.show', $booking)
+                ->with('error', 'Payment completion failed: ' . $e->getMessage());
         }
     }
 }

@@ -236,9 +236,17 @@ class EsewaPaymentService
             'payment_status' => 'paid',
         ]);
 
-        // Send confirmation notifications
-        app(NotificationService::class)->sendBookingConfirmation($booking);
-        app(NotificationService::class)->sendPaymentReceived($booking);
+        // Send confirmation notifications (wrapped in try-catch to prevent payment failure)
+        try {
+            app(NotificationService::class)->sendBookingConfirmation($booking);
+            app(NotificationService::class)->sendPaymentReceived($booking);
+        } catch (\Exception $e) {
+            \Log::warning('Failed to send payment notifications', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage()
+            ]);
+            // Don't fail the payment if notifications fail
+        }
 
         Log::info('eSewa payment completed successfully', [
             'payment_id' => $payment->id,

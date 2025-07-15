@@ -60,8 +60,8 @@
                                             {{ $payment->booking->booking_reference }}
                                         </div>
                                         <div class="text-sm text-gray-500">
-                                            {{ $payment->booking->schedule->route->source_city }} → 
-                                            {{ $payment->booking->schedule->route->destination_city }}
+                                            {{ $payment->booking->schedule->route->sourceCity->name }} →
+                                            {{ $payment->booking->schedule->route->destinationCity->name }}
                                         </div>
                                         <div class="text-xs text-gray-400">
                                             {{ $payment->booking->schedule->travel_date->format('M d, Y') }}
@@ -91,7 +91,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
-                                        <a href="{{ route('booking.show', $payment->booking) }}" 
+                                        <a href="{{ route('bookings.show', $payment->booking) }}"
                                            class="text-blue-600 hover:text-blue-900">
                                             View Booking
                                         </a>

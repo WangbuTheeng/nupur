@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Services\EsewaPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -337,10 +338,17 @@ class PaymentController extends Controller
      */
     public function history()
     {
-        // Get payments from bookings
-        $payments = Auth::user()->bookings()
-            ->with(['schedule.route', 'schedule.bus'])
-            ->where('status', 'confirmed')
+        // Get payments with their associated bookings
+        $payments = Payment::whereHas('booking', function($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->with([
+                'booking.schedule.route.sourceCity',
+                'booking.schedule.route.destinationCity',
+                'booking.schedule.bus',
+                'booking.schedule.operator'
+            ])
+            ->where('status', 'completed')
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
