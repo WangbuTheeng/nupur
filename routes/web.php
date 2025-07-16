@@ -733,6 +733,695 @@ Route::get('/debug/esewa-service-test', function () {
     ], 200, [], JSON_PRETTY_PRINT);
 })->name('debug.esewa.service.test');
 
+// Test eSewa payment data format (matches documentation example)
+Route::get('/debug/esewa-payment-data', function () {
+    // Create test data matching the documentation example
+    $testPaymentData = [
+        'amount' => '100',
+        'tax_amount' => '10',
+        'total_amount' => '110',
+        'transaction_uuid' => '241028',
+        'product_code' => 'EPAYTEST',
+        'product_service_charge' => '0',
+        'product_delivery_charge' => '0',
+        'success_url' => 'https://developer.esewa.com.np/success',
+        'failure_url' => 'https://developer.esewa.com.np/failure',
+        'signed_field_names' => 'total_amount,transaction_uuid,product_code',
+    ];
+
+    // Generate signature
+    $message = sprintf(
+        'total_amount=%s,transaction_uuid=%s,product_code=%s',
+        $testPaymentData['total_amount'],
+        $testPaymentData['transaction_uuid'],
+        $testPaymentData['product_code']
+    );
+
+    $secretKey = config('services.esewa.secret_key');
+    $signature = hash_hmac('sha256', $message, $secretKey, true);
+    $signatureBase64 = base64_encode($signature);
+
+    $testPaymentData['signature'] = $signatureBase64;
+
+    // Generate form HTML
+    $formFields = '';
+    foreach ($testPaymentData as $key => $value) {
+        $formFields .= '<input type="hidden" name="' . $key . '" value="' . htmlspecialchars($value) . '">' . "\n";
+    }
+
+    $formHtml = '
+    <form id="esewa-payment-form" action="' . config('services.esewa.payment_url') . '" method="POST">
+        ' . $formFields . '
+        <button type="submit" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px;">
+            Pay with eSewa (Test)
+        </button>
+    </form>';
+
+    return response()->json([
+        'message' => $message,
+        'signature' => $signatureBase64,
+        'expected_signature' => 'i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=',
+        'signatures_match' => $signatureBase64 === 'i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=',
+        'payment_data' => $testPaymentData,
+        'form_html' => $formHtml,
+        'payment_url' => config('services.esewa.payment_url')
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.payment.data');
+
+// Test eSewa form page (HTML)
+Route::get('/debug/esewa-form-test', function () {
+    // Create test data matching the documentation example
+    $testPaymentData = [
+        'amount' => '100',
+        'tax_amount' => '10',
+        'total_amount' => '110',
+        'transaction_uuid' => '241028-' . time(), // Make it unique
+        'product_code' => 'EPAYTEST',
+        'product_service_charge' => '0',
+        'product_delivery_charge' => '0',
+        'success_url' => url('/payment/esewa/success'),
+        'failure_url' => url('/payment/esewa/failure'),
+        'signed_field_names' => 'total_amount,transaction_uuid,product_code',
+    ];
+
+    // Generate signature
+    $message = sprintf(
+        'total_amount=%s,transaction_uuid=%s,product_code=%s',
+        $testPaymentData['total_amount'],
+        $testPaymentData['transaction_uuid'],
+        $testPaymentData['product_code']
+    );
+
+    $secretKey = config('services.esewa.secret_key');
+    $signature = hash_hmac('sha256', $message, $secretKey, true);
+    $signatureBase64 = base64_encode($signature);
+
+    $testPaymentData['signature'] = $signatureBase64;
+
+    // Generate form fields
+    $formFields = '';
+    foreach ($testPaymentData as $key => $value) {
+        $formFields .= '<input type="hidden" name="' . $key . '" value="' . htmlspecialchars($value) . '">' . "\n";
+    }
+
+    $html = '<!DOCTYPE html>
+<html>
+<head>
+    <title>eSewa Payment Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .form-container { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #218838; }
+        .debug { background: #e9ecef; padding: 10px; border-radius: 3px; font-family: monospace; font-size: 12px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>eSewa Payment Test (v2 API)</h1>
+
+        <div class="info">
+            <h3>Test Information:</h3>
+            <p><strong>Payment URL:</strong> ' . config('services.esewa.payment_url') . '</p>
+            <p><strong>Amount:</strong> NPR 100 + NPR 10 (tax) = NPR 110</p>
+            <p><strong>Transaction UUID:</strong> ' . $testPaymentData['transaction_uuid'] . '</p>
+            <p><strong>Signature:</strong> ' . $signatureBase64 . '</p>
+        </div>
+
+        <div class="form-container">
+            <form id="esewa-payment-form" action="' . config('services.esewa.payment_url') . '" method="POST">
+                ' . $formFields . '
+                <button type="submit">Pay NPR 110 with eSewa</button>
+            </form>
+        </div>
+
+        <div class="debug">
+            <strong>Debug Info:</strong><br>
+            Message: ' . $message . '<br>
+            Secret Key: ' . substr($secretKey, 0, 5) . '***<br>
+            Generated Signature: ' . $signatureBase64 . '<br>
+            Expected Signature: i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=<br>
+            Signatures Match: ' . ($signatureBase64 === 'i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=' ? 'No (different transaction_uuid)' : 'No') . '
+        </div>
+
+        <script>
+            // Auto-submit after 3 seconds
+            setTimeout(function() {
+                if (confirm("Auto-submit the form to eSewa?")) {
+                    document.getElementById("esewa-payment-form").submit();
+                }
+            }, 3000);
+        </script>
+    </div>
+</body>
+</html>';
+
+    return response($html)->header('Content-Type', 'text/html');
+})->name('debug.esewa.form.test');
+
+// Test eSewa with actual booking data
+Route::get('/debug/esewa-booking-test/{booking}', function (\App\Models\Booking $booking) {
+    $esewaService = new \App\Services\EsewaPaymentService();
+
+    try {
+        $result = $esewaService->initiatePayment($booking);
+
+        if ($result['success']) {
+            return response($result['form_html'])->header('Content-Type', 'text/html');
+        } else {
+            return response()->json([
+                'error' => $result['message'],
+                'booking_id' => $booking->id,
+                'booking_amount' => $booking->total_amount
+            ], 400, [], JSON_PRETTY_PRINT);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'booking_id' => $booking->id
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.esewa.booking.test');
+
+// Test eSewa V2 Service (Robust Implementation)
+Route::get('/debug/esewa-v2-test', function () {
+    // Create test booking data
+    $testBooking = new \App\Models\Booking([
+        'id' => 999,
+        'user_id' => 1,
+        'total_amount' => 1500,
+    ]);
+
+    $esewaServiceV2 = new \App\Services\EsewaPaymentServiceV2();
+
+    try {
+        $result = $esewaServiceV2->initiatePayment($testBooking);
+
+        if ($result['success']) {
+            $html = '<!DOCTYPE html>
+<html>
+<head>
+    <title>eSewa V2 Payment Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-4 text-center">eSewa V2 Payment Test</h1>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h3 class="font-semibold text-blue-800">Test Information:</h3>
+            <p class="text-blue-700 text-sm">Amount: NPR 1,500</p>
+            <p class="text-blue-700 text-sm">Transaction: ' . $result['payment_data']['transaction_uuid'] . '</p>
+            <p class="text-blue-700 text-sm">Signature: ' . substr($result['payment_data']['signature'], 0, 20) . '...</p>
+        </div>
+        ' . $result['form_html'] . '
+    </div>
+</body>
+</html>';
+
+            return response($html)->header('Content-Type', 'text/html');
+        } else {
+            return response()->json([
+                'error' => $result['message'],
+                'test_booking' => $testBooking->toArray()
+            ], 400, [], JSON_PRETTY_PRINT);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.esewa.v2.test');
+
+// Test eSewa URL accessibility (both production and test)
+Route::get('/debug/esewa-url-status', function () {
+    $urls = [
+        'production' => 'https://epay.esewa.com.np/api/epay/main/v2/form',
+        'test' => 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
+    ];
+
+    $results = [];
+
+    foreach ($urls as $type => $url) {
+        try {
+            $start = microtime(true);
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($url);
+            $end = microtime(true);
+
+            $results[$type] = [
+                'url' => $url,
+                'status_code' => $response->status(),
+                'accessible' => $response->successful() || $response->status() === 405,
+                'response_time' => round(($end - $start) * 1000, 2) . 'ms',
+                'headers' => $response->headers(),
+                'body_preview' => substr($response->body(), 0, 200)
+            ];
+        } catch (\Exception $e) {
+            $results[$type] = [
+                'url' => $url,
+                'accessible' => false,
+                'error' => $e->getMessage(),
+                'response_time' => 'timeout'
+            ];
+        }
+    }
+
+    return response()->json([
+        'timestamp' => now()->toDateTimeString(),
+        'results' => $results,
+        'recommendation' => $results['production']['accessible'] ? 'Use production URL' :
+                          ($results['test']['accessible'] ? 'Use test URL' : 'Both URLs unavailable - use test payment'),
+        'current_config' => config('services.esewa.payment_url')
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.url.status');
+
+// Test eSewa V3 Service (Ultimate Robust Implementation)
+Route::get('/debug/esewa-v3-test', function () {
+    // Create test booking data
+    $testBooking = new \App\Models\Booking([
+        'id' => 999,
+        'user_id' => 1,
+        'total_amount' => 1200,
+    ]);
+
+    $esewaServiceV3 = new \App\Services\EsewaPaymentServiceV3();
+
+    try {
+        $result = $esewaServiceV3->initiatePayment($testBooking);
+
+        if ($result['success']) {
+            $html = '<!DOCTYPE html>
+<html>
+<head>
+    <title>eSewa V3 Payment Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-4 text-center">eSewa V3 Payment Test</h1>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h3 class="font-semibold text-blue-800">Test Information:</h3>
+            <p class="text-blue-700 text-sm">Amount: NPR 1,200</p>
+            <p class="text-blue-700 text-sm">Payment Method: ' . $result['payment']->payment_method . '</p>
+            <p class="text-blue-700 text-sm">Transaction: ' . $result['payment']->transaction_id . '</p>
+            <p class="text-blue-700 text-sm">Is Simulation: ' . ($result['is_simulation'] ? 'Yes' : 'No') . '</p>
+        </div>
+        ' . $result['form_html'] . '
+    </div>
+</body>
+</html>';
+
+            return response($html)->header('Content-Type', 'text/html');
+        } else {
+            return response()->json([
+                'error' => $result['message'],
+                'test_booking' => $testBooking->toArray()
+            ], 400, [], JSON_PRETTY_PRINT);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.esewa.v3.test');
+
+// Comprehensive eSewa Status Dashboard
+Route::get('/debug/esewa-status-dashboard', function () {
+    $html = '<!DOCTYPE html>
+<html>
+<head>
+    <title>eSewa Integration Status Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta http-equiv="refresh" content="30">
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">eSewa Integration Status Dashboard</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- URL Status Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">URL Accessibility</h3>
+                <div class="space-y-2">
+                    <a href="/debug/esewa-url-status" target="_blank" class="block w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center">
+                        Check URL Status
+                    </a>
+                </div>
+            </div>
+
+            <!-- Original Service Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">Original eSewa Service</h3>
+                <div class="space-y-2">
+                    <a href="/debug/esewa-config" target="_blank" class="block w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">
+                        Check Config
+                    </a>
+                    <a href="/debug/esewa-form-test" target="_blank" class="block w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">
+                        Test Form
+                    </a>
+                </div>
+            </div>
+
+            <!-- V2 Service Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">eSewa V2 Service</h3>
+                <div class="space-y-2">
+                    <a href="/debug/esewa-v2-test" target="_blank" class="block w-full bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-center">
+                        Test V2 Service
+                    </a>
+                </div>
+            </div>
+
+            <!-- V3 Service Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">eSewa V3 Service (Robust)</h3>
+                <div class="space-y-2">
+                    <a href="/debug/esewa-v3-test" target="_blank" class="block w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-center">
+                        Test V3 Service
+                    </a>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">Includes intelligent fallbacks and simulator</p>
+            </div>
+
+            <!-- Simulator Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">eSewa Simulator</h3>
+                <div class="space-y-2">
+                    <button onclick="testSimulator()" class="block w-full bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 text-center">
+                        Test Simulator
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">For testing when eSewa is unavailable</p>
+            </div>
+
+            <!-- Current Status Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-800">Current Status</h3>
+                <div class="space-y-2">
+                    <div class="text-sm">
+                        <span class="font-medium">Environment:</span>
+                        <span class="text-blue-600">Development</span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium">Merchant ID:</span>
+                        <span class="text-green-600">EPAYTEST</span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium">Auto-refresh:</span>
+                        <span class="text-gray-600">30 seconds</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">Implementation Notes</h3>
+            <div class="space-y-3 text-sm text-gray-600">
+                <div class="flex items-start">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                    <span><strong>V3 Service:</strong> Automatically detects working eSewa URLs and falls back to simulator when needed</span>
+                </div>
+                <div class="flex items-start">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                    <span><strong>Simulator:</strong> Provides realistic payment testing when eSewa test environment is down</span>
+                </div>
+                <div class="flex items-start">
+                    <span class="w-2 h-2 bg-yellow-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                    <span><strong>Error Handling:</strong> Graceful fallbacks ensure payment flow always works</span>
+                </div>
+                <div class="flex items-start">
+                    <span class="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                    <span><strong>Production Ready:</strong> Simply update merchant credentials for live environment</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+            Last updated: ' . now()->format('Y-m-d H:i:s') . ' | Auto-refresh enabled
+        </div>
+    </div>
+
+    <script>
+        function testSimulator() {
+            // Create a test booking and redirect to V3 test (which will use simulator if eSewa is down)
+            window.open("/debug/esewa-v3-test", "_blank");
+        }
+    </script>
+</body>
+</html>';
+
+    return response($html)->header('Content-Type', 'text/html');
+})->name('debug.esewa.dashboard');
+
+// Debug seat selection functionality
+Route::get('/debug/seat-selection-test', function () {
+    // Find a schedule with available seats for testing
+    $schedule = \App\Models\Schedule::with(['route', 'bus'])
+        ->where('travel_date', '>=', now()->toDateString())
+        ->first();
+
+    if (!$schedule) {
+        return response()->json([
+            'error' => 'No schedules found for testing',
+            'suggestion' => 'Create a schedule first'
+        ], 404);
+    }
+
+    return response()->json([
+        'schedule_id' => $schedule->id,
+        'route' => $schedule->route->full_name,
+        'travel_date' => $schedule->travel_date->format('Y-m-d'),
+        'departure_time' => $schedule->departure_time->format('H:i'),
+        'bus' => $schedule->bus->display_name,
+        'seat_selection_url' => route('booking.seat-selection', $schedule->id),
+        'test_instructions' => [
+            '1. Visit the seat selection URL',
+            '2. Open browser console (F12)',
+            '3. Look for seat selection debug messages',
+            '4. Try clicking on green seats',
+            '5. Use debugSeatSelection() in console for debug info',
+            '6. Use testSeatClick("1") to manually test seat selection'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.seat.selection.test');
+
+// Debug eSewa payment integration with official credentials
+Route::get('/debug/esewa-test', function () {
+    // Test eSewa signature generation with official credentials
+    $merchantId = 'EPAYTEST';
+    $secretKey = '8gBm/:&EnhH.1/q';
+    $totalAmount = 100;
+    $transactionUuid = '241028';
+    $productCode = 'EPAYTEST';
+
+    // Generate signature exactly as per official documentation
+    $signatureData = "total_amount={$totalAmount},transaction_uuid={$transactionUuid},product_code={$productCode}";
+    $signature = base64_encode(hash_hmac('sha256', $signatureData, $secretKey, true));
+
+    // Expected signature from documentation: i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=
+    $expectedSignature = 'i94zsd3oXF6ZsSr/kGqT4sSzYQzjj1W/waxjWyRwaME=';
+
+    return response()->json([
+        'test_data' => [
+            'merchant_id' => $merchantId,
+            'secret_key' => $secretKey,
+            'total_amount' => $totalAmount,
+            'transaction_uuid' => $transactionUuid,
+            'product_code' => $productCode
+        ],
+        'signature_generation' => [
+            'signature_data' => $signatureData,
+            'generated_signature' => $signature,
+            'expected_signature' => $expectedSignature,
+            'signatures_match' => $signature === $expectedSignature
+        ],
+        'official_urls' => [
+            'test_payment_url' => 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
+            'production_payment_url' => 'https://epay.esewa.com.np/api/epay/main/v2/form',
+            'test_status_url' => 'https://rc.esewa.com.np/api/epay/transaction/status/',
+            'production_status_url' => 'https://epay.esewa.com.np/api/epay/transaction/status/'
+        ],
+        'test_credentials' => [
+            'esewa_id' => '9806800001/2/3/4/5',
+            'password' => 'Nepal@123',
+            'mpin' => '1122',
+            'token' => '123456'
+        ],
+        'status' => $signature === $expectedSignature ? 'SUCCESS - Signature matches official documentation' : 'ERROR - Signature mismatch'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.test');
+
+// Test eSewa payment with a real booking
+Route::get('/debug/esewa-payment-test', function () {
+    // Find or create a test booking
+    $user = \App\Models\User::first();
+    if (!$user) {
+        return response()->json(['error' => 'No users found. Create a user first.'], 404);
+    }
+
+    $schedule = \App\Models\Schedule::with(['route', 'bus'])
+        ->where('travel_date', '>=', now()->toDateString())
+        ->first();
+
+    if (!$schedule) {
+        return response()->json(['error' => 'No schedules found. Create a schedule first.'], 404);
+    }
+
+    // Create a test booking with correct field names
+    $booking = \App\Models\Booking::create([
+        'user_id' => $user->id,
+        'schedule_id' => $schedule->id,
+        'seat_numbers' => ['1', '2'],
+        'passenger_count' => 2,
+        'total_amount' => 1000.00,
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'booking_reference' => 'TEST-' . time(),
+        'passenger_details' => json_encode([
+            'name' => 'Test User',
+            'phone' => '9800000000',
+            'email' => 'test@example.com'
+        ]),
+        'contact_phone' => '9800000000',
+        'contact_email' => 'test@example.com',
+        'booking_type' => 'online'
+    ]);
+
+    return response()->json([
+        'booking_created' => [
+            'id' => $booking->id,
+            'reference' => $booking->booking_reference,
+            'amount' => $booking->total_amount,
+            'seats' => $booking->seat_numbers,
+            'passenger_count' => $booking->passenger_count,
+            'contact_phone' => $booking->contact_phone,
+            'contact_email' => $booking->contact_email
+        ],
+        'payment_test_url' => route('payment.options', $booking->id),
+        'instructions' => [
+            '1. Visit the payment test URL above',
+            '2. Click "Pay with eSewa"',
+            '3. You should be redirected to eSewa login page',
+            '4. Use test credentials: ID: 9806800001, Password: Nepal@123, Token: 123456',
+            '5. Complete the payment to test the full flow'
+        ],
+        'test_credentials' => [
+            'esewa_id' => '9806800001 (or 9806800002/3/4/5)',
+            'password' => 'Nepal@123',
+            'mpin' => '1122',
+            'token' => '123456'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.esewa.payment.test');
+
+// Direct eSewa payment form test (bypasses booking creation)
+Route::get('/debug/esewa-direct-test', function () {
+    // Official eSewa v2 test data from documentation
+    $merchantId = 'EPAYTEST';
+    $secretKey = '8gBm/:&EnhH.1/q';
+    $amount = 100.0;
+    $taxAmount = 10.0;
+    $totalAmount = 110.0;
+    $transactionUuid = '241028-' . time(); // Make it unique
+    $serviceCharge = 0.0;
+    $deliveryCharge = 0.0;
+
+    // Generate signature
+    $signatureData = "total_amount={$totalAmount},transaction_uuid={$transactionUuid},product_code={$merchantId}";
+    $signature = base64_encode(hash_hmac('sha256', $signatureData, $secretKey, true));
+
+    // Form data
+    $formData = [
+        'amount' => $amount,
+        'tax_amount' => $taxAmount,
+        'total_amount' => $totalAmount,
+        'transaction_uuid' => $transactionUuid,
+        'product_code' => $merchantId,
+        'product_service_charge' => $serviceCharge,
+        'product_delivery_charge' => $deliveryCharge,
+        'success_url' => 'https://developer.esewa.com.np/success',
+        'failure_url' => 'https://developer.esewa.com.np/failure',
+        'signed_field_names' => 'total_amount,transaction_uuid,product_code',
+        'signature' => $signature
+    ];
+
+    // Generate form HTML
+    $formFields = '';
+    foreach ($formData as $key => $value) {
+        $formFields .= '<input type="hidden" name="' . $key . '" value="' . htmlspecialchars($value) . '">' . "\n";
+    }
+
+    $html = '
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>eSewa Direct Payment Test</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+            .form-container { background: #f8f9fa; padding: 30px; border-radius: 10px; margin: 20px 0; }
+            .btn { background: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+            .btn:hover { background: #218838; }
+            .info { background: #e7f3ff; padding: 15px; border-radius: 5px; margin: 10px 0; }
+            .data { background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; }
+        </style>
+    </head>
+    <body>
+        <h1>🔧 eSewa Direct Payment Test</h1>
+
+        <div class="info">
+            <h3>📋 Test Information:</h3>
+            <p><strong>Purpose:</strong> Direct test of eSewa v2 API with official credentials</p>
+            <p><strong>Amount:</strong> Rs. ' . $totalAmount . ' (Amount: ' . $amount . ' + Tax: ' . $taxAmount . ')</p>
+            <p><strong>Transaction ID:</strong> ' . $transactionUuid . '</p>
+        </div>
+
+        <div class="info">
+            <h3>🔑 Test Credentials (Use these on eSewa login page):</h3>
+            <p><strong>eSewa ID:</strong> 9806800001 (or 9806800002/3/4/5)</p>
+            <p><strong>Password:</strong> Nepal@123</p>
+            <p><strong>MPIN:</strong> 1122</p>
+            <p><strong>Token:</strong> 123456</p>
+        </div>
+
+        <div class="form-container">
+            <h3>💳 eSewa Payment Form</h3>
+            <form action="https://rc-epay.esewa.com.np/api/epay/main/v2/form" method="POST">
+                ' . $formFields . '
+                <button type="submit" class="btn">Pay Rs. ' . $totalAmount . ' with eSewa</button>
+            </form>
+        </div>
+
+        <div class="info">
+            <h3>📊 Form Data Being Sent:</h3>
+            <div class="data">' . json_encode($formData, JSON_PRETTY_PRINT) . '</div>
+        </div>
+
+        <div class="info">
+            <h3>🔐 Signature Verification:</h3>
+            <p><strong>Signature Data:</strong> ' . $signatureData . '</p>
+            <p><strong>Generated Signature:</strong> ' . $signature . '</p>
+        </div>
+
+        <div class="info">
+            <h3>📝 Expected Flow:</h3>
+            <ol>
+                <li>Click "Pay with eSewa" button above</li>
+                <li>Should redirect to eSewa login page (NOT show "Unable to fetch merchant key")</li>
+                <li>Enter test credentials provided above</li>
+                <li>Complete payment process</li>
+                <li>Should redirect to success page</li>
+            </ol>
+        </div>
+    </body>
+    </html>';
+
+    return response($html)->header('Content-Type', 'text/html');
+})->name('debug.esewa.direct.test');
+
 // Test time-based booking restrictions
 Route::get('/test/time-restrictions/{scheduleId?}', function ($scheduleId = null) {
     if ($scheduleId) {

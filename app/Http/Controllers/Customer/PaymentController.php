@@ -124,22 +124,20 @@ class PaymentController extends Controller
                 'payment_method' => 'esewa',
             ]);
 
-            // Initiate payment with eSewa
-            $result = $this->esewaService->initiatePayment($booking);
+            // Use the new robust eSewa V3 service with intelligent fallbacks
+            $esewaServiceV3 = new \App\Services\EsewaPaymentServiceV3();
+            $result = $esewaServiceV3->initiatePayment($booking);
 
             if ($result['success']) {
                 return view('customer.payment.esewa-redirect', [
                     'booking' => $booking,
                     'payment' => $result['payment'],
-                    'form_html' => $result['form_html']
+                    'form_html' => $result['form_html'],
+                    'is_simulation' => $result['is_simulation'] ?? false
                 ]);
             } else {
-                // If eSewa is unavailable, show error with fallback option
-                if (isset($result['error_code']) && $result['error_code'] === 'ESEWA_UNAVAILABLE') {
-                    return back()->with('error', $result['message'])
-                                ->with('show_test_payment', true);
-                }
-                return back()->with('error', $result['message']);
+                return back()->with('error', $result['message'])
+                            ->with('show_test_payment', true);
             }
 
         } catch (\Exception $e) {
@@ -148,7 +146,8 @@ class PaymentController extends Controller
                 'error' => $e->getMessage()
             ]);
 
-            return back()->with('error', 'Payment processing failed. Please try again.');
+            return back()->with('error', 'Payment processing failed. Please try again.')
+                        ->with('show_test_payment', true);
         }
     }
 

@@ -496,6 +496,28 @@
     font-size: 18px;
     font-weight: bold;
 }
+
+/* Ensure seats are clickable - Fix for seat selection issue */
+.seat {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10;
+}
+
+.seat.seat-available {
+    cursor: pointer !important;
+}
+
+.seat.seat-booked,
+.seat.seat-reserved {
+    cursor: not-allowed !important;
+}
+
+/* Debug styles */
+.seat:hover {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
 </style>
 
 <!-- Include real-time seat map CSS and script -->
@@ -511,6 +533,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log('🚌 [SEAT-SELECTION] Page loaded for schedule:', scheduleId);
     console.log('🚌 [SEAT-SELECTION] Fare per seat:', farePerSeat);
+
+    // Debug: Check if seats are present in DOM
+    setTimeout(() => {
+        const allSeats = document.querySelectorAll('.seat');
+        console.log('🪑 [DEBUG] Total seats found:', allSeats.length);
+        allSeats.forEach((seat, index) => {
+            if (index < 5) { // Log first 5 seats for debugging
+                console.log('🪑 [DEBUG] Seat', index + 1, ':', {
+                    seatNumber: seat.dataset.seatNumber || seat.dataset.seat,
+                    classes: seat.className,
+                    isAvailable: seat.dataset.isAvailable,
+                    hasClickListener: seat.onclick !== null
+                });
+            }
+        });
+    }, 500);
 
     // Initialize real-time seat map
     initializeRealtimeSeatMap();
@@ -590,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             setupSeatClickHandlers();
             console.log('🚌 [REALTIME-SEAT-MAP] Seat map loaded and click handlers set up');
-        }, 1000);
+        }, 1500);
 
         // Refresh seat map every 30 seconds to ensure we have latest data
         setInterval(() => {
@@ -600,82 +638,124 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 30000);
     }
 
+    // Fallback initialization if realtime seat map fails to load
+    setTimeout(() => {
+        if (!realtimeSeatMap) {
+            console.log('🚌 [FALLBACK] Realtime seat map not loaded, setting up static handlers');
+            setupSeatClickHandlers();
+        }
+    }, 3000);
+
     // Initialize booking summary on page load
     updateBookingSummary();
 
+    // Single seat click handler function
     function setupSeatClickHandlers() {
+        console.log('🔧 [SETUP] Setting up seat click handlers...');
+
+        // Remove any existing event listeners first
+        document.querySelectorAll('.seat').forEach(seat => {
+            seat.replaceWith(seat.cloneNode(true));
+        });
+
+        // Add single event listener to each seat
         document.querySelectorAll('.seat').forEach(seat => {
             // Only add click handler to available seats
-            if (!seat.classList.contains('booked') && !seat.classList.contains('reserved')) {
-                seat.addEventListener('click', function() {
-                    if (realtimeSeatMap && realtimeSeatMap.handleSeatClick) {
-                        realtimeSeatMap.handleSeatClick(this);
-                    } else {
-                        // Fallback to original seat click handling
-                        handleSeatClickFallback(this);
-                    }
+            const isAvailable = seat.dataset.isAvailable === 'true' || seat.classList.contains('seat-available');
+            const isBooked = seat.classList.contains('seat-booked') || seat.classList.contains('booked');
+            const isReserved = seat.classList.contains('seat-reserved') || seat.classList.contains('reserved');
+
+            console.log('🪑 [SEAT-SETUP]', {
+                seatNumber: seat.dataset.seatNumber || seat.dataset.seat,
+                isAvailable,
+                isBooked,
+                isReserved,
+                classes: seat.className
+            });
+
+            if (isAvailable && !isBooked && !isReserved) {
+                seat.style.cursor = 'pointer';
+                seat.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSeatClick(this);
                 });
+            } else {
+                seat.style.cursor = 'not-allowed';
             }
         });
+
+        console.log('🔧 [SETUP] Seat click handlers setup complete');
     }
 
-    function handleSeatClickFallback(seatElement) {
-        const seatNumber = seatElement.dataset.seat || seatElement.dataset.seatNumber;
+    function handleSeatClick(seatElement) {
+        const seatNumber = seatElement.dataset.seatNumber || seatElement.dataset.seat;
 
-        if (!seatNumber) return;
+        if (!seatNumber) {
+            console.warn('🪑 [WARNING] No seat number found for element:', seatElement);
+            return;
+        }
 
-        if (selectedSeats.includes(seatNumber)) {
+        console.log('🪑 [SEAT-CLICK] Seat clicked:', seatNumber);
+
+        // Check if seat is already selected
+        const isSelected = selectedSeats.includes(seatNumber);
+
+        if (isSelected) {
             // Deselect seat
             selectedSeats = selectedSeats.filter(s => s !== seatNumber);
             seatElement.classList.remove('seat-selected', 'selected');
             seatElement.classList.add('seat-available', 'available');
+            console.log('🪑 [SEAT-DESELECT] Seat deselected:', seatNumber);
         } else {
             // Select seat (max 10 seats)
             if (selectedSeats.length < 10) {
                 selectedSeats.push(seatNumber);
                 seatElement.classList.remove('seat-available', 'available');
                 seatElement.classList.add('seat-selected', 'selected');
+                console.log('🪑 [SEAT-SELECT] Seat selected:', seatNumber);
             } else {
                 alert('You can select maximum 10 seats at a time.');
                 return;
             }
         }
 
+        console.log('🪑 [SEAT-SELECTION] Current selection:', selectedSeats);
         updateBookingSummary();
     }
 
-    // Handle seat selection for all available seats (fallback for static seats)
-    document.querySelectorAll('.seat').forEach(seat => {
-        // Only add click handler to available seats
-        if (seat.dataset.isAvailable === 'true' && !seat.classList.contains('seat-booked')) {
-            seat.addEventListener('click', function() {
-                const seatNumber = this.dataset.seatNumber;
-                console.log('🪑 [SEAT-CLICK] Seat clicked:', seatNumber);
+    // Debug function - can be called from browser console
+    window.debugSeatSelection = function() {
+        console.log('🔍 [DEBUG] Seat Selection Debug Info:');
+        console.log('Selected seats:', selectedSeats);
+        console.log('Realtime seat map:', realtimeSeatMap);
 
-                if (this.classList.contains('seat-selected')) {
-                    // Deselect seat
-                    this.classList.remove('seat-selected');
-                    this.classList.add('seat-available');
-                    selectedSeats = selectedSeats.filter(s => s !== seatNumber);
-                    console.log('🪑 [SEAT-DESELECT] Seat deselected:', seatNumber);
-                } else {
-                    // Select seat (max 10 seats)
-                    if (selectedSeats.length < 10) {
-                        this.classList.remove('seat-available');
-                        this.classList.add('seat-selected');
-                        selectedSeats.push(seatNumber);
-                        console.log('🪑 [SEAT-SELECT] Seat selected:', seatNumber);
-                    } else {
-                        alert('You can select maximum 10 seats at a time.');
-                        return;
-                    }
-                }
+        const allSeats = document.querySelectorAll('.seat');
+        console.log('Total seats:', allSeats.length);
 
-                console.log('🪑 [SEAT-SELECTION] Current selection:', selectedSeats);
-                updateBookingSummary();
-            });
+        allSeats.forEach((seat, index) => {
+            if (index < 10) {
+                console.log(`Seat ${index + 1}:`, {
+                    element: seat,
+                    seatNumber: seat.dataset.seatNumber || seat.dataset.seat,
+                    classes: seat.className,
+                    isAvailable: seat.dataset.isAvailable,
+                    style: seat.style.cursor
+                });
+            }
+        });
+    };
+
+    // Test function to manually select a seat
+    window.testSeatClick = function(seatNumber) {
+        const seatElement = document.querySelector(`[data-seat-number="${seatNumber}"], [data-seat="${seatNumber}"]`);
+        if (seatElement) {
+            console.log('🧪 [TEST] Manually clicking seat:', seatNumber);
+            handleSeatClick(seatElement);
+        } else {
+            console.log('🧪 [TEST] Seat not found:', seatNumber);
         }
-    });
+    };
 
     function updateBookingSummary() {
         @if($existingReservation)

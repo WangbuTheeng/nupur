@@ -38,9 +38,9 @@ return [
     'esewa' => [
         'merchant_id' => env('ESEWA_MERCHANT_ID', 'EPAYTEST'),
         'secret_key' => env('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q'),
-        'base_url' => env('ESEWA_BASE_URL', 'https://uat.esewa.com.np'),
-        'payment_url' => env('ESEWA_PAYMENT_URL', 'https://uat.esewa.com.np/epay/main'),
-        'status_check_url' => env('ESEWA_STATUS_CHECK_URL', 'https://uat.esewa.com.np/epay/transrec'),
+        'base_url' => env('ESEWA_BASE_URL', 'https://epay.esewa.com.np'),
+        'payment_url' => env('ESEWA_PAYMENT_URL', 'https://epay.esewa.com.np/api/epay/main/v2/form'),
+        'status_check_url' => env('ESEWA_STATUS_CHECK_URL', 'https://epay.esewa.com.np/api/epay/transaction/status/'),
         'success_url' => env('ESEWA_SUCCESS_URL', env('APP_URL') . '/payment/esewa/success'),
         'failure_url' => env('ESEWA_FAILURE_URL', env('APP_URL') . '/payment/esewa/failure'),
     ],
