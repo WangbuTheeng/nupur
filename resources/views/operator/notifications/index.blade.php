@@ -43,6 +43,15 @@
                                         @case('booking_confirmed')
                                             <i class="fas fa-check-circle text-green-600"></i>
                                             @break
+                                        @case('booking_completed')
+                                            <i class="fas fa-flag-checkered text-purple-600"></i>
+                                            @break
+                                        @case('seat_reserved')
+                                            <i class="fas fa-chair text-orange-600"></i>
+                                            @break
+                                        @case('seat_reservation_expired')
+                                            <i class="fas fa-clock text-gray-600"></i>
+                                            @break
                                         @case('schedule_reminder')
                                             <i class="fas fa-calendar text-yellow-600"></i>
                                             @break

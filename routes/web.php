@@ -1727,7 +1727,7 @@ Route::get('/debug/khalti-callback-test', function () {
         'user_id' => $user->id,
         'payment_method' => 'khalti',
         'amount' => 500.00,
-        'currency' => 'NPR',
+        'currency' => 'NRs',
         'status' => 'pending',
         'transaction_id' => 'TEST-KHALTI-' . time(),
         'gateway_data' => [

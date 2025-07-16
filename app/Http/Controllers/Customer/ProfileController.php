@@ -113,7 +113,7 @@ class ProfileController extends Controller
             'booking_reminders' => ['boolean'],
             'payment_notifications' => ['boolean'],
             'preferred_language' => ['in:en,ne'],
-            'preferred_currency' => ['in:NPR,USD'],
+            'preferred_currency' => ['in:NRs,USD'],
         ]);
 
         // Update user preferences (you might want to create a separate preferences table)

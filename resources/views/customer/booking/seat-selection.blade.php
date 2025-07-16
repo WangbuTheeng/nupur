@@ -774,8 +774,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Update displays
         document.getElementById('seat-count').textContent = totalCount;
-        document.getElementById('subtotal').textContent = 'Rs. ' + totalSubtotal.toLocaleString();
-        document.getElementById('total-amount').textContent = 'Rs. ' + totalSubtotal.toLocaleString();
+        document.getElementById('subtotal').textContent = 'NRs ' + totalSubtotal.toLocaleString();
+        document.getElementById('total-amount').textContent = 'NRs ' + totalSubtotal.toLocaleString();
 
         // Update selected seats display
         const selectedSeatsDisplay = document.getElementById('selected-seats-display');

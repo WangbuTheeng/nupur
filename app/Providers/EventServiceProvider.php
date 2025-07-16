@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Events\BookingStatusUpdated;
+use App\Events\SeatReserved;
+use App\Events\SeatReservationExpired;
 use App\Listeners\SendOperatorNotification;
+use App\Listeners\SendOperatorSeatReservationNotification;
+use App\Listeners\SendOperatorSeatExpiryNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -16,6 +20,12 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         BookingStatusUpdated::class => [
             SendOperatorNotification::class,
+        ],
+        SeatReserved::class => [
+            SendOperatorSeatReservationNotification::class,
+        ],
+        SeatReservationExpired::class => [
+            SendOperatorSeatExpiryNotification::class,
         ],
     ];
 

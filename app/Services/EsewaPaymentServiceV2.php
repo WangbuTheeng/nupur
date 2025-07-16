@@ -50,7 +50,7 @@ class EsewaPaymentServiceV2
                 'user_id' => $booking->user_id,
                 'payment_method' => 'esewa',
                 'amount' => $booking->total_amount,
-                'currency' => 'NPR',
+                'currency' => 'NRs',
                 'status' => 'pending',
                 'transaction_id' => $this->generateTransactionId(),
                 'gateway_data' => $additionalData,

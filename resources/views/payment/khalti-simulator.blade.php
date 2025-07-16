@@ -42,7 +42,7 @@
                     </div>
                     <div class="flex justify-between border-t pt-3">
                         <span class="text-lg font-semibold text-gray-900">Total Amount:</span>
-                        <span class="text-lg font-bold text-purple-600">Rs. {{ number_format($amount) }}</span>
+                        <span class="text-lg font-bold text-purple-600">NRs {{ number_format($amount) }}</span>
                     </div>
                 </div>
             </div>

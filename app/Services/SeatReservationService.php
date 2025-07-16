@@ -6,6 +6,8 @@ use App\Models\SeatReservation;
 use App\Models\Schedule;
 use App\Models\Booking;
 use App\Events\SeatUpdated;
+use App\Events\SeatReserved;
+use App\Events\SeatReservationExpired;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -52,6 +54,11 @@ class SeatReservationService
             // Fire seat update events only for newly reserved seats
             foreach ($newSeats as $seatNumber) {
                 event(new SeatUpdated($schedule, $seatNumber, 'reserved', $userId));
+            }
+
+            // Fire seat reservation event for operator notification
+            if (!empty($newSeats)) {
+                event(new SeatReserved($reservation, $schedule, $newSeats));
             }
 
             Log::info('Seats reserved successfully', [
@@ -155,24 +162,19 @@ class SeatReservationService
     {
         $unavailable = [];
 
-        // Check booked seats (excluding current user's bookings if specified)
-        $bookedSeatsQuery = Booking::where('schedule_id', $scheduleId)
-                                  ->whereIn('status', ['confirmed', 'pending']);
-
-        if ($excludeUserId) {
-            $bookedSeatsQuery->where('user_id', '!=', $excludeUserId);
-        }
-
-        $bookedSeats = $bookedSeatsQuery->get()
-                                       ->pluck('seat_numbers')
-                                       ->flatten()
-                                       ->unique()
-                                       ->toArray();
+        // Check booked seats
+        $bookedSeats = Booking::where('schedule_id', $scheduleId)
+                             ->whereIn('status', ['confirmed', 'pending'])
+                             ->get()
+                             ->pluck('seat_numbers')
+                             ->flatten()
+                             ->unique()
+                             ->toArray();
 
         // Check reserved seats (excluding current user)
         $reservedSeats = SeatReservation::where('schedule_id', $scheduleId)
                                       ->active();
-
+        
         if ($excludeUserId) {
             $reservedSeats->where('user_id', '!=', $excludeUserId);
         }
@@ -216,6 +218,9 @@ class SeatReservationService
             foreach ($seatNumbers as $seatNumber) {
                 event(new SeatUpdated($schedule, $seatNumber, 'available', null));
             }
+
+            // Fire seat reservation expired event for operator notification
+            event(new SeatReservationExpired($reservation, $schedule, $seatNumbers));
 
             $cleanedCount++;
         }

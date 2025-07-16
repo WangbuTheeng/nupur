@@ -368,7 +368,7 @@ function printCompactTicket() {
             </div>
 
             <div class="compact-row" style="border-top: 1px solid #000; padding-top: 3px; margin-top: 5px;">
-                <span>Total: NPR {{ number_format($booking->total_amount) }}</span>
+                <span>Total: NRs {{ number_format($booking->total_amount) }}</span>
                 <span>{{ ucfirst($booking->status) }}</span>
             </div>
 

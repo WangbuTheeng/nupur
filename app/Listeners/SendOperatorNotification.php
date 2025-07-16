@@ -27,12 +27,12 @@ class SendOperatorNotification implements ShouldQueue
     public function handle(BookingStatusUpdated $event): void
     {
         $booking = $event->booking;
-        
-        // Only send notification for new bookings (pending status)
-        if ($booking->status === 'pending' && $booking->wasRecentlyCreated) {
+
+        // Send notification for new bookings (any initial status)
+        if ($booking->wasRecentlyCreated) {
             $this->notificationService->sendOperatorBookingNotification($booking);
         }
-        
+
         // Send notification for status changes
         if ($booking->wasChanged('status') && !$booking->wasRecentlyCreated) {
             $this->sendStatusChangeNotification($booking);

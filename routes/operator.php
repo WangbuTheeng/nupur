@@ -8,6 +8,7 @@ use App\Http\Controllers\Operator\ReportController;
 use App\Http\Controllers\Operator\DashboardController;
 use App\Http\Controllers\Operator\NotificationController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,6 +19,25 @@ use Illuminate\Support\Facades\Route;
 | All routes are protected by the 'operator' middleware.
 |
 */
+
+// Debug route to check authentication
+Route::get('operator/debug-auth', function() {
+    return response()->json([
+        'authenticated' => Auth::check(),
+        'user' => Auth::user() ? [
+            'id' => Auth::user()->id,
+            'name' => Auth::user()->name,
+            'email' => Auth::user()->email,
+            'roles' => Auth::user()->getRoleNames(),
+            'is_operator' => Auth::user()->isOperator(),
+            'is_admin' => Auth::user()->isAdmin(),
+        ] : null,
+        'session_id' => session()->getId(),
+        'middleware_test' => 'This route has no middleware'
+    ]);
+})->name('operator.debug.auth');
+
+
 
 Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->group(function () {
     
@@ -49,14 +69,29 @@ Route::middleware(['auth', 'operator'])->prefix('operator')->name('operator.')->
     
     // Booking Management
     Route::resource('bookings', BookingController::class)->only(['index', 'show', 'edit', 'update']);
+
+    // Debug route within middleware
+    Route::get('debug-middleware', function() {
+        return response()->json([
+            'message' => 'Middleware is working!',
+            'user' => Auth::user()->name,
+            'operator_id' => Auth::user()->id,
+            'roles' => Auth::user()->getRoleNames(),
+            'timestamp' => now()
+        ]);
+    })->name('debug.middleware');
+
+    // Static routes (must come before parameterized routes)
+    Route::get('bookings/export-pdf', [BookingController::class, 'exportPdf'])->name('bookings.export-pdf');
+    Route::get('bookings/today', [BookingController::class, 'today'])->name('bookings.today');
+    Route::get('bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
+
+    // Parameterized routes (must come after static routes)
     Route::post('bookings/{booking}/confirm', [BookingController::class, 'confirm'])->name('bookings.confirm');
     Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])->name('bookings.cancel');
     Route::post('bookings/{booking}/refund', [BookingController::class, 'refund'])->name('bookings.refund');
-    Route::get('bookings/today', [BookingController::class, 'today'])->name('bookings.today');
-    Route::get('bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
     Route::get('bookings/{booking}/ticket', [BookingController::class, 'ticket'])->name('bookings.ticket');
     Route::get('bookings/{booking}/download-compact-ticket', [BookingController::class, 'downloadCompactTicket'])->name('bookings.download-compact-ticket');
-    Route::get('bookings/export', [BookingController::class, 'export'])->name('bookings.export');
     Route::get('bookings/{booking}/receipt', [BookingController::class, 'receipt'])->name('bookings.receipt');
     
     // Counter Booking (Manual Booking)

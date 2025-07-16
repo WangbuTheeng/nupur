@@ -224,8 +224,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update price calculation
         const subtotal = count * farePerSeat;
         document.getElementById('seat-count').textContent = count;
-        document.getElementById('subtotal').textContent = `Rs. ${subtotal.toLocaleString()}`;
-        document.getElementById('total-amount').textContent = `Rs. ${subtotal.toLocaleString()}`;
+        document.getElementById('subtotal').textContent = `NRs ${subtotal.toLocaleString()}`;
+        document.getElementById('total-amount').textContent = `NRs ${subtotal.toLocaleString()}`;
     }
     
     function updateProceedButton(enabled) {

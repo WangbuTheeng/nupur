@@ -90,7 +90,7 @@
                                 <div class="flex-1">
                                     <div class="flex items-center justify-between mb-2">
                                         <h3 class="text-lg font-semibold text-gray-900">{{ $schedule->bus->display_name }}</h3>
-                                        <span class="text-2xl font-bold text-blue-600">NPR {{ number_format($schedule->fare) }}</span>
+                                        <span class="text-2xl font-bold text-blue-600">NRs {{ number_format($schedule->fare) }}</span>
                                     </div>
                                     
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

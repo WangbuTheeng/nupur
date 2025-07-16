@@ -17,11 +17,133 @@ class ReportController extends Controller
     /**
      * Display the reports dashboard.
      */
-    public function index()
+    public function index(Request $request)
     {
         $operator = Auth::user();
-        
-        return view('operator.reports.index');
+
+        // Get date range from request or default to last 30 days
+        $startDate = $request->get('start_date', now()->subDays(30)->format('Y-m-d'));
+        $endDate = $request->get('end_date', now()->format('Y-m-d'));
+        $routeId = $request->get('route_id');
+
+        $dateFrom = Carbon::parse($startDate);
+        $dateTo = Carbon::parse($endDate);
+
+        // Get operator's routes for filter dropdown
+        $routes = $operator->routes()->where('is_active', true)->get();
+
+        // Build base query for bookings
+        $bookingsQuery = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->whereBetween('created_at', [$dateFrom, $dateTo]);
+
+        // Apply route filter if selected
+        if ($routeId) {
+            $bookingsQuery->whereHas('schedule', function($q) use ($routeId) {
+                $q->where('route_id', $routeId);
+            });
+        }
+
+        // Calculate key metrics
+        $confirmedBookings = $bookingsQuery->where('status', 'confirmed');
+        $totalRevenue = $confirmedBookings->sum('total_amount');
+        $totalBookings = $bookingsQuery->count();
+        $totalPassengers = $confirmedBookings->sum('passenger_count');
+
+        // Calculate average occupancy
+        $schedules = $operator->schedules()
+            ->with('bus')
+            ->whereBetween('travel_date', [$dateFrom, $dateTo])
+            ->get();
+
+        $totalSeats = 0;
+        $bookedSeats = 0;
+
+        foreach ($schedules as $schedule) {
+            $totalSeats += $schedule->bus->total_seats ?? 0;
+            $bookedSeats += $schedule->bookings()->where('status', 'confirmed')->sum('passenger_count');
+        }
+
+        $avgOccupancy = $totalSeats > 0 ? ($bookedSeats / $totalSeats) * 100 : 0;
+
+        $metrics = [
+            'total_revenue' => $totalRevenue,
+            'total_bookings' => $totalBookings,
+            'total_passengers' => $totalPassengers,
+            'avg_occupancy' => $avgOccupancy,
+        ];
+
+        // Get booking status distribution
+        $bookingStats = [
+            'confirmed' => $bookingsQuery->where('status', 'confirmed')->count(),
+            'pending' => $bookingsQuery->where('status', 'pending')->count(),
+            'cancelled' => $bookingsQuery->where('status', 'cancelled')->count(),
+        ];
+
+        // Get top performing routes
+        $topRoutes = $operator->schedules()
+            ->with(['route.sourceCity', 'route.destinationCity', 'bus'])
+            ->whereBetween('travel_date', [$dateFrom, $dateTo])
+            ->get()
+            ->groupBy('route_id')
+            ->map(function($schedules) {
+                $route = $schedules->first()->route;
+
+                $totalBookings = 0;
+                $totalPassengers = 0;
+                $totalRevenue = 0;
+                $totalSeats = 0;
+
+                foreach ($schedules as $schedule) {
+                    $confirmedBookings = $schedule->bookings()->where('status', 'confirmed')->get();
+                    $totalBookings += $confirmedBookings->count();
+                    $totalPassengers += $confirmedBookings->sum('passenger_count');
+                    $totalRevenue += $confirmedBookings->sum('total_amount');
+                    $totalSeats += $schedule->bus->total_seats ?? 0;
+                }
+
+                $avgOccupancy = $totalSeats > 0 ? ($totalPassengers / $totalSeats) * 100 : 0;
+
+                return (object) [
+                    'name' => $route->sourceCity->name . ' → ' . $route->destinationCity->name,
+                    'source_city' => $route->sourceCity->name,
+                    'destination_city' => $route->destinationCity->name,
+                    'total_bookings' => $totalBookings,
+                    'total_passengers' => $totalPassengers,
+                    'total_revenue' => $totalRevenue,
+                    'avg_occupancy' => $avgOccupancy,
+                ];
+            })
+            ->sortByDesc('total_revenue')
+            ->take(5);
+
+        // Get recent transactions
+        $recentTransactions = $bookingsQuery
+            ->with(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity'])
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get()
+            ->map(function($booking) {
+                return (object) [
+                    'created_at' => $booking->created_at,
+                    'customer_name' => $booking->user->name ?? 'Guest',
+                    'route_name' => $booking->schedule->route->sourceCity->name . ' → ' . $booking->schedule->route->destinationCity->name,
+                    'seats_count' => $booking->passenger_count,
+                    'amount' => $booking->total_amount,
+                    'status' => $booking->status,
+                ];
+            });
+
+        return view('operator.reports.index', compact(
+            'metrics',
+            'bookingStats',
+            'topRoutes',
+            'recentTransactions',
+            'routes',
+            'startDate',
+            'endDate',
+            'routeId'
+        ));
     }
 
     /**
@@ -365,7 +487,7 @@ class ReportController extends Controller
         $operator = Auth::user();
         
         $request->validate([
-            'report_type' => 'required|in:revenue,route_performance,bus_utilization,customer_analytics',
+            'report_type' => 'required|in:revenue,route_performance,bus_utilization,customer_analytics,bookings,passengers',
             'date_from' => 'required|date',
             'date_to' => 'required|date|after_or_equal:date_from',
         ]);
@@ -396,6 +518,12 @@ class ReportController extends Controller
                     break;
                 case 'customer_analytics':
                     $this->exportCustomerAnalyticsReport($file, $operator, $dateFrom, $dateTo);
+                    break;
+                case 'bookings':
+                    $this->exportBookingsReport($file, $operator, $dateFrom, $dateTo);
+                    break;
+                case 'passengers':
+                    $this->exportPassengersReport($file, $operator, $dateFrom, $dateTo);
                     break;
             }
 
@@ -511,6 +639,285 @@ class ReportController extends Controller
                 $totalBookings,
                 $totalSpent,
                 $averageValue,
+            ]);
+        }
+    }
+
+    /**
+     * Generate bus performance report.
+     */
+    public function buses(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->date_from ? Carbon::parse($request->date_from) : Carbon::now()->subMonth();
+        $dateTo = $request->date_to ? Carbon::parse($request->date_to) : Carbon::now();
+
+        $buses = $operator->buses()
+            ->with(['busType'])
+            ->get()
+            ->map(function($bus) use ($dateFrom, $dateTo) {
+                $schedules = $bus->schedules()
+                    ->whereBetween('travel_date', [$dateFrom, $dateTo])
+                    ->get();
+
+                $totalSchedules = $schedules->count();
+                $totalBookings = 0;
+                $totalRevenue = 0;
+                $totalPassengers = 0;
+
+                foreach ($schedules as $schedule) {
+                    $confirmedBookings = $schedule->bookings()->where('status', 'confirmed')->get();
+                    $totalBookings += $confirmedBookings->count();
+                    $totalRevenue += $confirmedBookings->sum('total_amount');
+                    $totalPassengers += $confirmedBookings->sum('passenger_count');
+                }
+
+                $utilizationRate = $totalSchedules > 0 ? ($totalSchedules / $dateFrom->diffInDays($dateTo)) * 100 : 0;
+                $occupancyRate = ($bus->total_seats * $totalSchedules) > 0 ?
+                    ($totalPassengers / ($bus->total_seats * $totalSchedules)) * 100 : 0;
+
+                return [
+                    'bus' => $bus,
+                    'total_schedules' => $totalSchedules,
+                    'total_bookings' => $totalBookings,
+                    'total_revenue' => $totalRevenue,
+                    'total_passengers' => $totalPassengers,
+                    'utilization_rate' => min($utilizationRate, 100),
+                    'occupancy_rate' => $occupancyRate,
+                    'revenue_per_trip' => $totalSchedules > 0 ? $totalRevenue / $totalSchedules : 0,
+                ];
+            })
+            ->sortByDesc('total_revenue');
+
+        return view('operator.reports.buses', compact('buses', 'dateFrom', 'dateTo'));
+    }
+
+    /**
+     * Generate route performance report.
+     */
+    public function routes(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->date_from ? Carbon::parse($request->date_from) : Carbon::now()->subMonth();
+        $dateTo = $request->date_to ? Carbon::parse($request->date_to) : Carbon::now();
+
+        $routes = $operator->schedules()
+            ->with(['route.sourceCity', 'route.destinationCity', 'bus'])
+            ->whereBetween('travel_date', [$dateFrom, $dateTo])
+            ->get()
+            ->groupBy('route_id')
+            ->map(function($schedules) {
+                $route = $schedules->first()->route;
+
+                $totalSchedules = $schedules->count();
+                $totalBookings = 0;
+                $totalRevenue = 0;
+                $totalPassengers = 0;
+                $totalSeats = 0;
+
+                foreach ($schedules as $schedule) {
+                    $confirmedBookings = $schedule->bookings()->where('status', 'confirmed')->get();
+                    $totalBookings += $confirmedBookings->count();
+                    $totalRevenue += $confirmedBookings->sum('total_amount');
+                    $totalPassengers += $confirmedBookings->sum('passenger_count');
+                    $totalSeats += $schedule->bus->total_seats ?? 0;
+                }
+
+                $occupancyRate = $totalSeats > 0 ? ($totalPassengers / $totalSeats) * 100 : 0;
+                $avgRevenuePerTrip = $totalSchedules > 0 ? $totalRevenue / $totalSchedules : 0;
+
+                return [
+                    'route' => $route,
+                    'total_schedules' => $totalSchedules,
+                    'total_bookings' => $totalBookings,
+                    'total_revenue' => $totalRevenue,
+                    'total_passengers' => $totalPassengers,
+                    'occupancy_rate' => $occupancyRate,
+                    'avg_revenue_per_trip' => $avgRevenuePerTrip,
+                ];
+            })
+            ->sortByDesc('total_revenue');
+
+        return view('operator.reports.routes', compact('routes', 'dateFrom', 'dateTo'));
+    }
+
+    /**
+     * Generate passenger analytics report.
+     */
+    public function passengers(Request $request)
+    {
+        $operator = Auth::user();
+
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->date_from ? Carbon::parse($request->date_from) : Carbon::now()->subMonth();
+        $dateTo = $request->date_to ? Carbon::parse($request->date_to) : Carbon::now();
+
+        // Top customers by revenue
+        $topCustomers = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->where('status', 'confirmed')
+          ->whereBetween('created_at', [$dateFrom, $dateTo])
+          ->with('user')
+          ->get()
+          ->groupBy('user_id')
+          ->map(function($bookings) {
+              $user = $bookings->first()->user;
+              return [
+                  'user' => $user,
+                  'total_bookings' => $bookings->count(),
+                  'total_spent' => $bookings->sum('total_amount'),
+                  'total_passengers' => $bookings->sum('passenger_count'),
+                  'average_booking_value' => $bookings->avg('total_amount'),
+                  'last_booking' => $bookings->max('created_at'),
+              ];
+          })
+          ->sortByDesc('total_spent')
+          ->take(50);
+
+        // Passenger demographics
+        $totalPassengers = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->where('status', 'confirmed')
+          ->whereBetween('created_at', [$dateFrom, $dateTo])
+          ->sum('passenger_count');
+
+        $repeatCustomers = $topCustomers->where('total_bookings', '>', 1)->count();
+        $newCustomers = $topCustomers->where('total_bookings', '=', 1)->count();
+
+        $stats = [
+            'total_passengers' => $totalPassengers,
+            'unique_customers' => $topCustomers->count(),
+            'repeat_customers' => $repeatCustomers,
+            'new_customers' => $newCustomers,
+            'repeat_rate' => $topCustomers->count() > 0 ? ($repeatCustomers / $topCustomers->count()) * 100 : 0,
+        ];
+
+        return view('operator.reports.passengers', compact('topCustomers', 'stats', 'dateFrom', 'dateTo'));
+    }
+
+    /**
+     * Export revenue report.
+     */
+    public function exportRevenue(Request $request)
+    {
+        return $this->export($request->merge(['report_type' => 'revenue']));
+    }
+
+    /**
+     * Export bookings report.
+     */
+    public function exportBookings(Request $request)
+    {
+        return $this->export($request->merge(['report_type' => 'bookings']));
+    }
+
+    /**
+     * Export passengers report.
+     */
+    public function exportPassengers(Request $request)
+    {
+        return $this->export($request->merge(['report_type' => 'passengers']));
+    }
+
+    private function exportBookingsReport($file, $operator, $dateFrom, $dateTo)
+    {
+        // CSV headers
+        fputcsv($file, [
+            'Booking Reference',
+            'Date',
+            'Customer',
+            'Route',
+            'Seats',
+            'Passengers',
+            'Amount',
+            'Status',
+            'Payment Method',
+            'Booking Type'
+        ]);
+
+        $bookings = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->with(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity'])
+          ->whereBetween('created_at', [$dateFrom, $dateTo])
+          ->orderBy('created_at', 'desc')
+          ->get();
+
+        foreach ($bookings as $booking) {
+            fputcsv($file, [
+                $booking->booking_reference,
+                $booking->created_at->format('Y-m-d H:i:s'),
+                $booking->user->name ?? 'Guest',
+                $booking->schedule->route->sourceCity->name . ' → ' . $booking->schedule->route->destinationCity->name,
+                implode(', ', $booking->seat_numbers),
+                $booking->passenger_count,
+                $booking->total_amount,
+                $booking->status,
+                $booking->payment_method,
+                $booking->booking_type
+            ]);
+        }
+    }
+
+    private function exportPassengersReport($file, $operator, $dateFrom, $dateTo)
+    {
+        // CSV headers
+        fputcsv($file, [
+            'Customer Name',
+            'Email',
+            'Total Bookings',
+            'Total Passengers',
+            'Total Spent',
+            'Average Booking Value',
+            'Last Booking',
+            'Customer Type'
+        ]);
+
+        $customers = Booking::whereHas('schedule', function($q) use ($operator) {
+            $q->where('operator_id', $operator->id);
+        })->where('status', 'confirmed')
+          ->whereBetween('created_at', [$dateFrom, $dateTo])
+          ->with('user')
+          ->get()
+          ->groupBy('user_id')
+          ->map(function($bookings) {
+              $user = $bookings->first()->user;
+              return [
+                  'user' => $user,
+                  'total_bookings' => $bookings->count(),
+                  'total_passengers' => $bookings->sum('passenger_count'),
+                  'total_spent' => $bookings->sum('total_amount'),
+                  'average_booking_value' => $bookings->avg('total_amount'),
+                  'last_booking' => $bookings->max('created_at'),
+              ];
+          })
+          ->sortByDesc('total_spent');
+
+        foreach ($customers as $customerData) {
+            fputcsv($file, [
+                $customerData['user']->name ?? 'Guest',
+                $customerData['user']->email ?? 'N/A',
+                $customerData['total_bookings'],
+                $customerData['total_passengers'],
+                $customerData['total_spent'],
+                number_format($customerData['average_booking_value'], 2),
+                \Carbon\Carbon::parse($customerData['last_booking'])->format('Y-m-d H:i:s'),
+                $customerData['total_bookings'] > 1 ? 'Repeat' : 'New'
             ]);
         }
     }

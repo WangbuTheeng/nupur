@@ -200,7 +200,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Spent</h3>
-                    <p class="text-3xl font-bold text-gray-900 mt-2">Rs. {{ number_format($stats['total_spent']) }}</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-2">NRs {{ number_format($stats['total_spent']) }}</p>
                     <div class="flex items-center mt-2">
                         <span class="text-xs text-purple-600 font-medium">Travel investment</span>
                     </div>

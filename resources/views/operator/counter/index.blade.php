@@ -90,7 +90,7 @@
                     <div class="ml-4 flex-1">
                         <dl>
                             <dt class="text-sm font-medium text-gray-500 truncate">Today's Revenue</dt>
-                            <dd class="text-2xl font-bold text-gray-900">Rs. {{ number_format($stats['today_revenue'], 2) }}</dd>
+                            <dd class="text-2xl font-bold text-gray-900">NRs {{ number_format($stats['today_revenue'], 2) }}</dd>
                             <dd class="text-xs text-gray-400 mt-1">Total earnings</dd>
                         </dl>
                     </div>

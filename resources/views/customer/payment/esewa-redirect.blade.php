@@ -25,7 +25,7 @@
                     </div>
                     <div class="flex justify-between items-center text-sm mt-2">
                         <span class="text-gray-600">Amount:</span>
-                        <span class="font-medium">NPR {{ number_format($booking->total_amount, 2) }}</span>
+                        <span class="font-medium">NRs {{ number_format($booking->total_amount, 2) }}</span>
                     </div>
                     <div class="flex justify-between items-center text-sm mt-2">
                         <span class="text-gray-600">Payment Method:</span>

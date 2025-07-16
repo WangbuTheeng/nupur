@@ -127,19 +127,19 @@
                                     <input type="radio" name="price_range" value="budget" 
                                            {{ request('price_range') == 'budget' ? 'checked' : '' }}
                                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                    <span class="ml-2 text-sm text-gray-700">Budget (Up to Rs. 1,000)</span>
+                                    <span class="ml-2 text-sm text-gray-700">Budget (Up to NRs 1,000)</span>
                                 </label>
                                 <label class="flex items-center">
-                                    <input type="radio" name="price_range" value="standard" 
+                                    <input type="radio" name="price_range" value="standard"
                                            {{ request('price_range') == 'standard' ? 'checked' : '' }}
                                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                    <span class="ml-2 text-sm text-gray-700">Standard (Rs. 1,000 - 2,000)</span>
+                                    <span class="ml-2 text-sm text-gray-700">Standard (NRs 1,000 - 2,000)</span>
                                 </label>
                                 <label class="flex items-center">
-                                    <input type="radio" name="price_range" value="premium" 
+                                    <input type="radio" name="price_range" value="premium"
                                            {{ request('price_range') == 'premium' ? 'checked' : '' }}
                                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                    <span class="ml-2 text-sm text-gray-700">Premium (Rs. 2,000+)</span>
+                                    <span class="ml-2 text-sm text-gray-700">Premium (NRs 2,000+)</span>
                                 </label>
                             </div>
                         </div>

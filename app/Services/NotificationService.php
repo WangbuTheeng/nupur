@@ -198,22 +198,36 @@ class NotificationService
     public function sendOperatorBookingNotification($booking)
     {
         $operator = $booking->schedule->operator;
+        $customerName = $booking->user->name ?? 'Guest Customer';
+        $routeName = $booking->schedule->route->sourceCity->name . ' → ' . $booking->schedule->route->destinationCity->name;
+        $seatList = implode(', ', $booking->seat_numbers);
+
+        $title = $booking->status === 'confirmed' ? 'New Booking Confirmed' : 'New Booking Received';
+        $statusText = $booking->status === 'confirmed' ? 'confirmed and paid' : 'received';
+
+        $message = "{$customerName} has {$statusText} booking {$booking->booking_reference} for {$routeName}. Seats: {$seatList}";
 
         return $this->sendNotification(
             $operator,
             'new_booking',
-            'New Booking Received',
-            "New booking {$booking->booking_reference} received for {$booking->schedule->route->full_name}.",
+            $title,
+            $message,
             [
                 'booking_id' => $booking->id,
                 'booking_reference' => $booking->booking_reference,
+                'customer_name' => $customerName,
                 'passenger_count' => $booking->passenger_count,
                 'total_amount' => $booking->total_amount,
-                'route' => $booking->schedule->route->full_name,
+                'seat_numbers' => $booking->seat_numbers,
+                'route' => $routeName,
+                'travel_date' => $booking->schedule->travel_date->format('Y-m-d'),
+                'departure_time' => $booking->schedule->departure_time->format('H:i'),
+                'status' => $booking->status,
+                'booking_type' => $booking->booking_type,
             ],
             route('operator.bookings.show', $booking),
             'View Booking',
-            'medium',
+            $booking->status === 'confirmed' ? 'high' : 'medium',
             ['database', 'realtime']
         );
     }

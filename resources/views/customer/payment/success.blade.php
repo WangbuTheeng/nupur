@@ -247,7 +247,7 @@
                             </svg>
                             <div>
                                 <p class="font-medium text-green-900">Payment Confirmed</p>
-                                <p class="text-sm text-green-700">Rs. {{ number_format($booking->total_amount) }} paid successfully</p>
+                                <p class="text-sm text-green-700">NRs {{ number_format($booking->total_amount) }} paid successfully</p>
                             </div>
                         </div>
                     </div>

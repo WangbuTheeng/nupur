@@ -24,6 +24,77 @@
         </div>
     </div>
 
+    <!-- Report Navigation -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Bookings Report -->
+        <a href="{{ route('operator.reports.bookings') }}" class="bg-white overflow-hidden shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300 border-l-4 border-blue-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-ticket-alt text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">Bookings Report</h3>
+                        <p class="text-sm text-gray-500">Detailed booking analysis</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Bus Performance -->
+        <a href="{{ route('operator.reports.buses') }}" class="bg-white overflow-hidden shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300 border-l-4 border-green-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-bus text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">Bus Performance</h3>
+                        <p class="text-sm text-gray-500">Individual bus analytics</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Route Performance -->
+        <a href="{{ route('operator.reports.routes') }}" class="bg-white overflow-hidden shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300 border-l-4 border-yellow-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-route text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">Route Performance</h3>
+                        <p class="text-sm text-gray-500">Route profitability analysis</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Passenger Analytics -->
+        <a href="{{ route('operator.reports.passengers') }}" class="bg-white overflow-hidden shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300 border-l-4 border-indigo-500">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-users text-indigo-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">Passenger Analytics</h3>
+                        <p class="text-sm text-gray-500">Customer behavior insights</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
     <!-- Date Range Filter -->
     <div class="bg-white overflow-hidden shadow-lg rounded-xl mb-8">
         <div class="px-6 py-4 border-b border-gray-200">

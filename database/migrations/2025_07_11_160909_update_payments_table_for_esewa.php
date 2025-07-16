@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('payments', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('booking_id')->constrained()->onDelete('cascade');
             $table->string('gateway_transaction_id')->nullable()->after('transaction_id');
-            $table->string('currency', 3)->default('NPR')->after('amount');
+            $table->string('currency', 3)->default('NRs')->after('amount');
             $table->json('gateway_data')->nullable()->after('gateway_response');
             $table->timestamp('failed_at')->nullable()->after('paid_at');
         });

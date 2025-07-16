@@ -177,8 +177,8 @@
                 background: white;
                 padding: 0;
             }
-            .print-btn, .download-btn {
-                display: none;
+            .print-btn, .download-btn, .back-btn, .receipt-btn, .success-banner {
+                display: none !important;
             }
             .compact-ticket {
                 box-shadow: none;
@@ -188,8 +188,17 @@
     </style>
 </head>
 <body>
+    <!-- Success Message for Counter Booking -->
+    @if(session('success'))
+    <div class="success-banner" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 10px; margin: 10px; border-radius: 5px; text-align: center; font-weight: bold;">
+        ✅ {{ session('success') }}
+    </div>
+    @endif
+
     <button class="print-btn" onclick="window.print()">🖨️ Print Ticket</button>
     <a href="{{ route('operator.bookings.download-compact-ticket', $booking) }}" class="download-btn">📄 Download PDF</a>
+    <a href="{{ route('operator.counter.index') }}" class="back-btn" style="position: fixed; top: 20px; left: 20px; background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-size: 14px;">← Back to Counter</a>
+    <a href="{{ route('operator.counter.receipt', $booking) }}" class="receipt-btn" style="position: fixed; top: 70px; left: 20px; background: #17a2b8; color: white; border: none; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-size: 14px;">📄 View Receipt</a>
     
     <div class="compact-ticket">
         <!-- Header -->
@@ -271,5 +280,21 @@
             <div style="margin-top: 2px;">Generated: {{ now()->format('M d, Y H:i') }}</div>
         </div>
     </div>
+
+    <script>
+        // Auto-trigger print dialog when page loads
+        window.addEventListener('load', function() {
+            // Small delay to ensure page is fully rendered
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+
+        // Handle print dialog close
+        window.addEventListener('afterprint', function() {
+            // Optional: You can add any post-print actions here
+            console.log('Print dialog closed');
+        });
+    </script>
 </body>
 </html>

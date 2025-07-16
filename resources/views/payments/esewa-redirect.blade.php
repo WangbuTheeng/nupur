@@ -32,7 +32,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600">Amount:</span>
-                    <span class="font-bold text-green-600">Rs. {{ number_format($booking->total_amount) }}</span>
+                    <span class="font-bold text-green-600">NRs {{ number_format($booking->total_amount) }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600">Payment Method:</span>

@@ -53,7 +53,7 @@
                 <div class="border-t border-gray-200 pt-4">
                     <div class="flex justify-between text-lg font-semibold">
                         <span>Total Amount:</span>
-                        <span class="text-blue-600">NPR {{ number_format($booking->total_amount) }}</span>
+                        <span class="text-blue-600">NRs {{ number_format($booking->total_amount) }}</span>
                     </div>
                 </div>
             </div>
@@ -110,7 +110,7 @@
                 
                 <button id="khalti-payment-button" 
                         class="w-full bg-purple-600 text-white hover:bg-purple-700 px-4 py-3 rounded-md font-semibold transition duration-200">
-                    Pay NPR {{ number_format($booking->total_amount) }} with Khalti
+                    Pay NRs {{ number_format($booking->total_amount) }} with Khalti
                 </button>
             </div>
 

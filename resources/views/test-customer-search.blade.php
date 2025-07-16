@@ -44,7 +44,7 @@
                                 @foreach($schedules->take(3) as $schedule)
                                     <div class="border-l-4 border-blue-500 pl-3 mb-2">
                                         <div class="font-medium">{{ $schedule->route->sourceCity->name }} → {{ $schedule->route->destinationCity->name }}</div>
-                                        <div class="text-xs text-gray-500">{{ $schedule->travel_date->format('M d, Y') }} • {{ $schedule->departure_time->format('H:i') }} • Rs. {{ number_format($schedule->fare) }}</div>
+                                        <div class="text-xs text-gray-500">{{ $schedule->travel_date->format('M d, Y') }} • {{ $schedule->departure_time->format('H:i') }} • NRs {{ number_format($schedule->fare) }}</div>
                                     </div>
                                 @endforeach
                                 @if($schedules->count() > 3)

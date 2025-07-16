@@ -102,7 +102,7 @@
                                 
                                 <div>
                                     <div class="text-sm text-gray-500">Fare per Seat</div>
-                                    <div class="text-xl font-bold text-gray-900">Rs. {{ number_format($schedule->fare, 2) }}</div>
+                                    <div class="text-xl font-bold text-gray-900">NRs {{ number_format($schedule->fare, 2) }}</div>
                                 </div>
                             </div>
 

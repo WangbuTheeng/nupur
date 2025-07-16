@@ -270,85 +270,100 @@ class BookingController extends Controller
     }
 
     /**
-     * Export bookings to CSV.
+     * Export bookings to PDF.
      */
-    public function export(Request $request)
+    public function exportPdf(Request $request)
     {
-        $operator = Auth::user();
-        
-        $query = Booking::whereHas('schedule', function($q) use ($operator) {
-            $q->where('operator_id', $operator->id);
-        })->with(['user', 'schedule.route', 'schedule.bus']);
+        // Simple test first
+        return response()->json([
+            'message' => 'PDF Export route is working!',
+            'operator' => Auth::user()->name,
+            'timestamp' => now(),
+            'request_params' => $request->all()
+        ]);
 
-        // Apply same filters as index
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
+        try {
+            $operator = Auth::user();
 
-        if ($request->filled('date_from')) {
-            $query->whereHas('schedule', function($q) use ($request) {
-                $q->whereDate('travel_date', '>=', $request->date_from);
-            });
-        }
-
-        if ($request->filled('date_to')) {
-            $query->whereHas('schedule', function($q) use ($request) {
-                $q->whereDate('travel_date', '<=', $request->date_to);
-            });
-        }
-
-        $bookings = $query->orderBy('created_at', 'desc')->get();
-
-        $filename = 'bookings_' . now()->format('Y-m-d_H-i-s') . '.csv';
-        
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ];
-
-        $callback = function() use ($bookings) {
-            $file = fopen('php://output', 'w');
-            
-            // CSV headers
-            fputcsv($file, [
-                'Booking Reference',
-                'Customer Name',
-                'Customer Email',
-                'Route',
-                'Travel Date',
-                'Departure Time',
-                'Bus',
-                'Seats',
-                'Passengers',
-                'Total Amount',
-                'Status',
-                'Payment Status',
-                'Booking Date',
+            \Log::info('Booking PDF export started', [
+                'operator_id' => $operator->id,
+                'request_params' => $request->all()
             ]);
 
-            // CSV data
-            foreach ($bookings as $booking) {
-                fputcsv($file, [
-                    $booking->booking_reference,
-                    $booking->user->name,
-                    $booking->user->email,
-                    $booking->schedule->route->full_name,
-                    $booking->schedule->travel_date->format('Y-m-d'),
-                    $booking->schedule->departure_time->format('H:i'),
-                    $booking->schedule->bus->display_name,
-                    implode(', ', $booking->seat_numbers),
-                    $booking->passenger_count,
-                    $booking->total_amount,
-                    $booking->status,
-                    $booking->payment_status,
-                    $booking->created_at->format('Y-m-d H:i:s'),
-                ]);
+            $query = Booking::whereHas('schedule', function($q) use ($operator) {
+                $q->where('operator_id', $operator->id);
+            })->with(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus']);
+
+            // Apply same filters as index
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
             }
 
-            fclose($file);
-        };
+            if ($request->filled('date_from')) {
+                $query->whereHas('schedule', function($q) use ($request) {
+                    $q->whereDate('travel_date', '>=', $request->date_from);
+                });
+            }
 
-        return response()->stream($callback, 200, $headers);
+            if ($request->filled('date_to')) {
+                $query->whereHas('schedule', function($q) use ($request) {
+                    $q->whereDate('travel_date', '<=', $request->date_to);
+                });
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('booking_reference', 'like', "%{$search}%")
+                      ->orWhereHas('user', function($userQuery) use ($search) {
+                          $userQuery->where('name', 'like', "%{$search}%")
+                                   ->orWhere('email', 'like', "%{$search}%")
+                                   ->orWhere('phone', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('schedule.route', function($routeQuery) use ($search) {
+                          $routeQuery->whereHas('sourceCity', function($cityQuery) use ($search) {
+                              $cityQuery->where('name', 'like', "%{$search}%");
+                          })->orWhereHas('destinationCity', function($cityQuery) use ($search) {
+                              $cityQuery->where('name', 'like', "%{$search}%");
+                          });
+                      });
+                });
+            }
+
+            $bookings = $query->orderBy('created_at', 'desc')->get();
+
+            \Log::info('Bookings retrieved for PDF export', [
+                'operator_id' => $operator->id,
+                'booking_count' => $bookings->count()
+            ]);
+
+            // Generate PDF
+            $pdf = PDF::loadView('operator.bookings.export-pdf', [
+                'bookings' => $bookings,
+                'operator' => $operator,
+                'filters' => $request->all(),
+                'exportDate' => now()
+            ]);
+
+            $filename = 'bookings_export_' . str_replace(' ', '_', $operator->company_name) . '_' . now()->format('Y_m_d_H_i_s') . '.pdf';
+
+            \Log::info('PDF export completed', [
+                'operator_id' => $operator->id,
+                'filename' => $filename,
+                'bookings_exported' => $bookings->count()
+            ]);
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            \Log::error('Booking PDF export failed', [
+                'operator_id' => $operator->id ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Failed to export bookings PDF. Please try again.');
+        }
     }
 
     /**

@@ -18,7 +18,7 @@
                     </p>
                 </div>
                 <div class="mt-4 md:mt-0 text-right">
-                    <div class="text-3xl font-bold">Rs. {{ number_format($booking->total_amount) }}</div>
+                    <div class="text-3xl font-bold">NRs {{ number_format($booking->total_amount) }}</div>
                     <div class="text-blue-200">{{ $booking->passenger_count }} passenger(s)</div>
                     <div class="text-blue-300 font-medium">
                         {{ count($booking->seat_numbers) }} seat(s): {{ implode(', ', $booking->seat_numbers) }}
@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.checked) {
                 submitBtn.disabled = false;
                 submitBtn.className = 'w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors';
-                submitBtn.textContent = `Pay Rs. {{ number_format($booking->total_amount) }} with ${this.closest('.payment-option').querySelector('h3').textContent}`;
+                submitBtn.textContent = `Pay NRs {{ number_format($booking->total_amount) }} with ${this.closest('.payment-option').querySelector('h3').textContent}`;
             }
         });
     });

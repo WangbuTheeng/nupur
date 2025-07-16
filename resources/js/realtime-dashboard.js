@@ -287,7 +287,7 @@ class RealtimeDashboard {
 
     formatStatValue(key, value) {
         if (key.includes('revenue') || key.includes('spent')) {
-            return `Rs. ${parseFloat(value).toLocaleString()}`;
+            return `NRs ${parseFloat(value).toLocaleString()}`;
         }
         return parseInt(value).toLocaleString();
     }

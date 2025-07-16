@@ -70,7 +70,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-medium text-gray-900">
-                                        Rs. {{ number_format($payment->amount) }}
+                                        NRs {{ number_format($payment->amount) }}
                                     </div>
                                     <div class="text-sm text-gray-500">
                                         {{ $payment->currency }}

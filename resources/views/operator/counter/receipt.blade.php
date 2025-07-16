@@ -19,12 +19,18 @@
                         </svg>
                         Back to Counter
                     </a>
-                    <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-white bg-opacity-20 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-opacity-30 focus:bg-opacity-30 transition ease-in-out duration-150">
+                    <a href="{{ route('operator.bookings.ticket', $booking) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-white bg-opacity-20 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-opacity-30 focus:bg-opacity-30 transition ease-in-out duration-150">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                         </svg>
-                        Print Receipt
-                    </button>
+                        Print Compact Ticket
+                    </a>
+                    <a href="{{ route('operator.bookings.download-compact-ticket', $booking) }}" class="inline-flex items-center px-4 py-2 bg-white bg-opacity-20 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-opacity-30 focus:bg-opacity-30 transition ease-in-out duration-150 ml-2">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Download Ticket
+                    </a>
                 </div>
             </div>
         </div>
@@ -192,8 +198,37 @@
         </div>
     </div>
 
+    <!-- Ticket Printing Notice -->
+    <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <i class="fas fa-ticket-alt text-green-600 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-green-800">
+                    Booking Confirmed - Ready to Print Ticket
+                </h3>
+                <div class="mt-2 text-sm text-green-700">
+                    <p>Your counter booking has been successfully created. Click "Print Compact Ticket" below to print the ticket for your passenger.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Action Buttons -->
-    <div class="mt-8 flex justify-center space-x-4">
+    <div class="mt-8 flex justify-center space-x-4 flex-wrap gap-4">
+        <!-- Print Compact Ticket Button -->
+        <!-- <a href="{{ route('operator.bookings.ticket', $booking) }}" target="_blank" class="inline-flex items-center px-8 py-4 border border-transparent text-lg font-bold rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-lg transform hover:scale-105 transition-all duration-200">
+            <i class="fas fa-print mr-3 text-xl"></i>
+            Print Compact Ticket
+        </a> -->
+
+        <!-- Download PDF Ticket Button -->
+        <!-- <a href="{{ route('operator.bookings.download-compact-ticket', $booking) }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-lg">
+            <i class="fas fa-download mr-2"></i>
+            Download PDF Ticket
+        </a> -->
+
         <a href="{{ route('operator.counter.search') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
             <i class="fas fa-plus mr-2"></i>
             Create Another Booking

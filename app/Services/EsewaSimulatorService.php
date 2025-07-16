@@ -25,7 +25,7 @@ class EsewaSimulatorService
                 'user_id' => $booking->user_id,
                 'payment_method' => 'esewa_simulator',
                 'amount' => $booking->total_amount,
-                'currency' => 'NPR',
+                'currency' => 'NRs',
                 'status' => 'pending',
                 'transaction_id' => $this->generateTransactionId(),
                 'gateway_data' => [

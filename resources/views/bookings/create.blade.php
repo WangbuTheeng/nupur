@@ -140,10 +140,10 @@
                     <div class="bg-gray-50 rounded-lg p-4 mb-6">
                         <div class="flex justify-between items-center">
                             <span class="text-lg font-medium text-gray-900">Total Amount:</span>
-                            <span id="total-amount" class="text-2xl font-bold text-blue-600">NPR 0</span>
+                            <span id="total-amount" class="text-2xl font-bold text-blue-600">NRs 0</span>
                         </div>
                         <p class="text-sm text-gray-600 mt-1">
-                            <span id="seat-count">0</span> seat(s) × NPR {{ number_format($schedule->fare) }}
+                            <span id="seat-count">0</span> seat(s) × NRs {{ number_format($schedule->fare) }}
                         </p>
                     </div>
 
@@ -208,7 +208,7 @@ function updateUI() {
     
     // Update total amount
     const totalAmount = selectedSeats.length * farePerSeat;
-    document.getElementById('total-amount').textContent = `NPR ${totalAmount.toLocaleString()}`;
+    document.getElementById('total-amount').textContent = `NRs ${totalAmount.toLocaleString()}`;
     document.getElementById('seat-count').textContent = selectedSeats.length;
     
     // Update hidden input
