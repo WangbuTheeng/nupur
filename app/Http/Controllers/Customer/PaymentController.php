@@ -156,22 +156,28 @@ class PaymentController extends Controller
      */
     private function processKhaltiPayment(Booking $booking)
     {
-        // For demo purposes, we'll simulate the Khalti payment process
-        // In production, you would integrate with actual Khalti API
-
-        $khaltiConfig = [
-            'public_key' => config('payment.khalti.public_key'),
-            'secret_key' => config('payment.khalti.secret_key'),
-        ];
+        // Use the real Khalti payment service instead of simulation
+        $khaltiService = app(\App\Services\KhaltiPaymentService::class);
 
         // Update booking with payment method
         $booking->update([
             'payment_method' => 'khalti',
-            'payment_gateway_reference' => 'KHL-' . time() . '-' . $booking->id,
         ]);
 
-        // For demo, redirect directly to success
-        return $this->simulatePaymentSuccess($booking, 'khalti');
+        // Initiate real Khalti payment
+        $result = $khaltiService->initiatePayment($booking);
+
+        if ($result['success']) {
+            // Show interactive Khalti payment page instead of direct redirect
+            return view('payments.khalti-redirect', [
+                'booking' => $booking,
+                'payment' => $result['payment'],
+                'payment_url' => $result['payment_url'],
+                'is_simulator' => $result['is_simulator'] ?? false
+            ]);
+        } else {
+            return back()->with('error', $result['message']);
+        }
     }
 
     /**

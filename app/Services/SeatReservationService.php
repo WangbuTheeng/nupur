@@ -155,19 +155,24 @@ class SeatReservationService
     {
         $unavailable = [];
 
-        // Check booked seats
-        $bookedSeats = Booking::where('schedule_id', $scheduleId)
-                             ->whereIn('status', ['confirmed', 'pending'])
-                             ->get()
-                             ->pluck('seat_numbers')
-                             ->flatten()
-                             ->unique()
-                             ->toArray();
+        // Check booked seats (excluding current user's bookings if specified)
+        $bookedSeatsQuery = Booking::where('schedule_id', $scheduleId)
+                                  ->whereIn('status', ['confirmed', 'pending']);
+
+        if ($excludeUserId) {
+            $bookedSeatsQuery->where('user_id', '!=', $excludeUserId);
+        }
+
+        $bookedSeats = $bookedSeatsQuery->get()
+                                       ->pluck('seat_numbers')
+                                       ->flatten()
+                                       ->unique()
+                                       ->toArray();
 
         // Check reserved seats (excluding current user)
         $reservedSeats = SeatReservation::where('schedule_id', $scheduleId)
                                       ->active();
-        
+
         if ($excludeUserId) {
             $reservedSeats->where('user_id', '!=', $excludeUserId);
         }

@@ -46,9 +46,11 @@ return [
     ],
 
     'khalti' => [
-        'public_key' => env('KHALTI_PUBLIC_KEY'),
-        'secret_key' => env('KHALTI_SECRET_KEY'),
-        'base_url' => env('KHALTI_BASE_URL', 'https://khalti.com/api/v2'),
+        'public_key' => env('KHALTI_PUBLIC_KEY', 'test_public_key_dc74e0fd57cb46cd93832aee0a390234'),
+        'secret_key' => env('KHALTI_SECRET_KEY', 'test_secret_key_f59e8b7d18b4499ca40f68195a846e9b'),
+        'base_url' => env('KHALTI_BASE_URL', 'https://dev.khalti.com/api/v2'), // Test environment
+        'success_url' => env('KHALTI_SUCCESS_URL', env('APP_URL', 'http://127.0.0.1:8000') . '/payment/khalti/success'),
+        'failure_url' => env('KHALTI_FAILURE_URL', env('APP_URL', 'http://127.0.0.1:8000') . '/payment/khalti/failure'),
     ],
 
 ];

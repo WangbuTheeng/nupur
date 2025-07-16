@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\EsewaPaymentService;
+use App\Services\KhaltiPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -12,10 +13,12 @@ use Illuminate\Support\Facades\Log;
 class PaymentController extends Controller
 {
     protected $esewaService;
+    protected $khaltiService;
 
-    public function __construct(EsewaPaymentService $esewaService)
+    public function __construct(EsewaPaymentService $esewaService, KhaltiPaymentService $khaltiService)
     {
         $this->esewaService = $esewaService;
+        $this->khaltiService = $khaltiService;
     }
 
     /**
@@ -69,6 +72,49 @@ class PaymentController extends Controller
 
         } catch (\Exception $e) {
             Log::error('eSewa payment initiation error', [
+                'booking_id' => $booking->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', 'Payment initiation failed. Please try again.');
+        }
+    }
+
+    /**
+     * Initiate Khalti payment
+     */
+    public function initiateKhaltiPayment(Request $request, Booking $booking)
+    {
+        try {
+            // Ensure user owns the booking
+            if ($booking->user_id !== Auth::id()) {
+                abort(403, 'Unauthorized access to booking');
+            }
+
+            // Check if booking is already paid
+            if ($booking->payment_status === 'paid') {
+                return redirect()->route('bookings.show', $booking)
+                    ->with('info', 'This booking has already been paid.');
+            }
+
+            // Initiate payment with Khalti
+            $result = $this->khaltiService->initiatePayment($booking);
+
+            if ($result['success']) {
+                // Show interactive Khalti payment page instead of direct redirect
+                return view('payments.khalti-redirect', [
+                    'booking' => $booking,
+                    'payment' => $result['payment'],
+                    'payment_url' => $result['payment_url'],
+                    'is_simulator' => $result['is_simulator'] ?? false
+                ]);
+            } else {
+                return back()->with('error', $result['message']);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Khalti payment initiation error', [
                 'booking_id' => $booking->id,
                 'user_id' => Auth::id(),
                 'error' => $e->getMessage()
@@ -191,6 +237,120 @@ class PaymentController extends Controller
                 'request_data' => $request->all(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
+            ]);
+
+            return view('payment.simple-failure', [
+                'error_message' => 'Payment processing failed. Please contact support.'
+            ]);
+        }
+    }
+
+    /**
+     * Handle Khalti payment success callback
+     */
+    public function khaltiSuccess(Request $request)
+    {
+        try {
+            // Get payment ID from query parameter
+            $paymentId = $request->get('payment_id');
+
+            Log::info('Khalti Success Callback', [
+                'payment_id' => $paymentId,
+                'request_data' => $request->all()
+            ]);
+
+            if (!$paymentId) {
+                throw new \Exception('Missing payment_id parameter in callback');
+            }
+
+            // Get required parameters from callback
+            $pidx = $request->get('pidx');
+            $status = $request->get('status');
+            $transactionId = $request->get('transaction_id');
+
+            if (!$pidx) {
+                throw new \Exception('Missing pidx parameter in callback');
+            }
+
+            // Verify payment with Khalti
+            $result = $this->khaltiService->verifyPayment($paymentId, $pidx);
+
+            if ($result['success']) {
+                $payment = $result['payment'];
+                $booking = $payment->booking;
+
+                Log::info('Khalti payment success - showing success page', [
+                    'payment_id' => $payment->id,
+                    'booking_id' => $booking->id,
+                    'payment_status' => $payment->status,
+                    'booking_payment_status' => $booking->payment_status,
+                    'booking_status' => $booking->status
+                ]);
+
+                // Redirect to payment success page with booking details
+                return redirect()->route('payment.success', $booking->id)
+                    ->with('success', 'Payment completed successfully via Khalti!')
+                    ->with('transaction_id', $transactionId)
+                    ->with('gateway', 'Khalti');
+            } else {
+                Log::error('Khalti payment verification failed', [
+                    'payment_id' => $paymentId,
+                    'error_message' => $result['message'],
+                    'result' => $result
+                ]);
+
+                return view('payment.simple-failure', [
+                    'payment_id' => $paymentId,
+                    'error_message' => $result['message']
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Khalti payment success handling error', [
+                'payment_id' => $paymentId,
+                'request_data' => $request->all(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return view('payment.simple-failure', [
+                'error_message' => 'Payment processing failed: ' . $e->getMessage(),
+                'payment_id' => $paymentId,
+                'debug_info' => [
+                    'pidx' => $request->get('pidx'),
+                    'status' => $request->get('status'),
+                    'transaction_id' => $request->get('transaction_id'),
+                    'error_type' => get_class($e)
+                ]
+            ]);
+        }
+    }
+
+    /**
+     * Handle Khalti payment failure callback
+     */
+    public function khaltiFailure(Request $request)
+    {
+        try {
+            // Get payment ID from query parameter
+            $paymentId = $request->get('payment_id');
+
+            Log::info('Khalti Failure Callback', [
+                'payment_id' => $paymentId,
+                'request_data' => $request->all()
+            ]);
+
+            return view('payment.simple-failure', [
+                'payment_id' => $paymentId,
+                'error_message' => 'Payment was cancelled or failed. You can try again.',
+                'gateway' => 'Khalti'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Khalti payment failure handling error', [
+                'payment_id' => $paymentId,
+                'request_data' => $request->all(),
+                'error' => $e->getMessage()
             ]);
 
             return view('payment.simple-failure', [

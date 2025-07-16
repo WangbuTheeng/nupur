@@ -77,19 +77,22 @@
                 </button>
             </form>
 
-            <!-- Khalti Payment (Coming Soon) -->
-            <div class="w-full p-6 border-2 border-gray-200 rounded-xl opacity-50 cursor-not-allowed">
-                <div class="text-center">
-                    <div class="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-                        <svg class="w-8 h-8 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                        </svg>
+            <!-- Khalti Payment -->
+            <form action="{{ route('payment.khalti.initiate', $booking) }}" method="POST">
+                @csrf
+                <button type="submit" class="w-full p-6 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 group">
+                    <div class="text-center">
+                        <div class="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200">
+                            <svg class="w-8 h-8 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Khalti</h3>
+                        <p class="text-sm text-gray-600">Digital wallet & multiple payment options</p>
+                        <div class="mt-3 text-xs text-purple-600 font-medium">✨ Now Available</div>
                     </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Khalti</h3>
-                    <p class="text-sm text-gray-600">Digital wallet payment</p>
-                    <div class="mt-3 text-xs text-gray-500 font-medium">Coming Soon</div>
-                </div>
-            </div>
+                </button>
+            </form>
 
             <!-- FonePay (Coming Soon) -->
             <div class="w-full p-6 border-2 border-gray-200 rounded-xl opacity-50 cursor-not-allowed">

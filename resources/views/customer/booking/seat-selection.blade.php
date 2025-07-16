@@ -866,6 +866,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Reserve seats via AJAX
         console.log('🔄 [RESERVE-ONLY] Starting seat reservation for:', selectedSeats);
+
+        // Convert seat numbers to integers for validation
+        const seatNumbersAsIntegers = selectedSeats.map(seat => parseInt(seat, 10));
+        console.log('🔄 [RESERVE-ONLY] Converted seat numbers to integers:', seatNumbersAsIntegers);
+
         fetch('{{ route("booking.reserve-seats-only") }}', {
             method: 'POST',
             headers: {
@@ -874,11 +879,16 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 schedule_id: scheduleId,
-                seat_numbers: selectedSeats
+                seat_numbers: seatNumbersAsIntegers
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('🔄 [RESERVE-ONLY] Response status:', response.status);
+            console.log('🔄 [RESERVE-ONLY] Response headers:', response.headers);
+            return response.json();
+        })
         .then(data => {
+            console.log('🔄 [RESERVE-ONLY] Response data:', data);
             if (data.success) {
                 alert(`Seats ${selectedSeats.join(', ')} have been reserved for 1 hour. You can proceed to book them anytime within this period.`);
 
@@ -904,12 +914,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectedSeats = [];
                 updateBookingSummary();
             } else {
+                console.error('🔄 [RESERVE-ONLY] Reservation failed:', data.message);
                 alert(data.message || 'Failed to reserve seats. Please try again.');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred. Please try again.');
+            console.error('🔄 [RESERVE-ONLY] Network/Parse Error:', error);
+            alert('An error occurred while reserving seats. Please check your connection and try again.');
         })
         .finally(() => {
             // Restore button state
@@ -942,6 +953,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.log('🚀 [PROCEED] Proceeding to passenger details with seats:', selectedSeats);
 
+        // Convert seat numbers to integers for validation
+        const seatNumbersAsIntegers = selectedSeats.map(seat => parseInt(seat, 10));
+        console.log('🚀 [PROCEED] Converted seat numbers to integers:', seatNumbersAsIntegers);
+
         // Reserve new seats via AJAX
         fetch('{{ route("booking.reserve-seats") }}', {
             method: 'POST',
@@ -951,20 +966,26 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({
                 schedule_id: scheduleId,
-                seat_numbers: selectedSeats
+                seat_numbers: seatNumbersAsIntegers
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('🚀 [PROCEED] Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('🚀 [PROCEED] Response data:', data);
             if (data.success) {
+                console.log('🚀 [PROCEED] Redirecting to:', data.redirect_url);
                 window.location.href = data.redirect_url;
             } else {
+                console.error('🚀 [PROCEED] Reservation failed:', data.message);
                 alert(data.message || 'Failed to reserve seats. Please try again.');
             }
         })
         .catch(error => {
-            console.error('Seat reservation error:', error);
-            alert('An error occurred while reserving seats. Please try again.');
+            console.error('🚀 [PROCEED] Network/Parse Error:', error);
+            alert('An error occurred while reserving seats. Please check your connection and try again.');
         });
     }
 

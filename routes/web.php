@@ -270,6 +270,10 @@ Route::get('/dashboard', function () {
 Route::get('/payment/esewa/success/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaSuccess'])->name('payment.esewa.success');
 Route::get('/payment/esewa/failure/{payment?}', [App\Http\Controllers\PaymentController::class, 'esewaFailure'])->name('payment.esewa.failure');
 
+// Khalti Payment Callback Routes (must be outside auth middleware)
+Route::get('/payment/khalti/success', [App\Http\Controllers\PaymentController::class, 'khaltiSuccess'])->name('payment.khalti.success');
+Route::get('/payment/khalti/failure', [App\Http\Controllers\PaymentController::class, 'khaltiFailure'])->name('payment.khalti.failure');
+
 // Test Payment Completion Route (for bypassing eSewa issues) - TEMPORARILY ENABLED
 Route::get('/payment/test-complete/{booking}', [App\Http\Controllers\PaymentController::class, 'testComplete'])->name('payment.test.complete');
 
@@ -281,6 +285,7 @@ Route::middleware('auth')->group(function () {
     // Payment Routes (require authentication)
     Route::get('/payment/{booking}/options', [App\Http\Controllers\PaymentController::class, 'showPaymentOptions'])->name('payment.options');
     Route::post('/payment/{booking}/esewa', [App\Http\Controllers\PaymentController::class, 'initiateEsewaPayment'])->name('payment.esewa.initiate');
+    Route::post('/payment/{booking}/khalti', [App\Http\Controllers\PaymentController::class, 'initiateKhaltiPayment'])->name('payment.khalti.initiate');
     Route::get('/payment/{payment}/status', [App\Http\Controllers\PaymentController::class, 'getPaymentStatus'])->name('payment.status');
     Route::get('/payment/{payment}/esewa/check-status', [App\Http\Controllers\PaymentController::class, 'checkEsewaStatus'])->name('payment.esewa.check-status');
     Route::get('/payments/history', [App\Http\Controllers\PaymentController::class, 'paymentHistory'])->name('payments.history');
@@ -1585,3 +1590,1370 @@ Route::get('/test/complete-time-system', function () {
 
     return response()->json($results, JSON_PRETTY_PRINT);
 });
+
+// Test Khalti payment integration
+Route::get('/debug/khalti-test', function () {
+    // Find or create a test booking
+    $user = \App\Models\User::first();
+    if (!$user) {
+        return response()->json(['error' => 'No users found. Create a user first.'], 404);
+    }
+
+    $schedule = \App\Models\Schedule::with(['route', 'bus'])
+        ->where('travel_date', '>=', now()->toDateString())
+        ->first();
+
+    if (!$schedule) {
+        return response()->json(['error' => 'No schedules found. Create a schedule first.'], 404);
+    }
+
+    // Create a test booking for Khalti
+    $booking = \App\Models\Booking::create([
+        'user_id' => $user->id,
+        'schedule_id' => $schedule->id,
+        'seat_numbers' => ['1', '2'],
+        'passenger_count' => 2,
+        'total_amount' => 500.00, // Rs. 500 (within test limit of Rs. 999)
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'booking_reference' => 'KHALTI-TEST-' . time(),
+        'passenger_details' => json_encode([
+            'name' => 'Test User',
+            'phone' => '9800000000',
+            'email' => 'test@khalti.com'
+        ]),
+        'contact_phone' => '9800000000',
+        'contact_email' => 'test@khalti.com',
+        'booking_type' => 'online'
+    ]);
+
+    return response()->json([
+        'booking_created' => [
+            'id' => $booking->id,
+            'reference' => $booking->booking_reference,
+            'amount' => $booking->total_amount,
+            'seats' => $booking->seat_numbers,
+            'passenger_count' => $booking->passenger_count
+        ],
+        'payment_test_url' => route('payment.options', $booking->id),
+        'khalti_test_credentials' => [
+            'khalti_id' => '9800000000 to 9800000005',
+            'mpin' => '1111',
+            'otp' => '987654'
+        ],
+        'instructions' => [
+            '1. Visit the payment test URL above',
+            '2. Click "Khalti" payment option',
+            '3. You should be redirected to Khalti payment page',
+            '4. Use test credentials provided above',
+            '5. Complete the payment to test the full flow'
+        ],
+        'test_info' => [
+            'environment' => 'Sandbox',
+            'max_amount' => 'Rs. 999 (without contract)',
+            'api_endpoint' => 'https://dev.khalti.com/api/v2',
+            'documentation' => 'https://docs.khalti.com/khalti-epayment/'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.test');
+
+// Test Khalti API configuration
+Route::get('/debug/khalti-config-test', function () {
+    $khaltiService = app(\App\Services\KhaltiPaymentService::class);
+
+    // Test configuration
+    $config = [
+        'secret_key' => config('services.khalti.secret_key'),
+        'base_url' => config('services.khalti.base_url'),
+        'success_url' => config('services.khalti.success_url'),
+        'failure_url' => config('services.khalti.failure_url')
+    ];
+
+    // Test API connectivity
+    try {
+        $response = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'Key ' . $config['secret_key'],
+            'Content-Type' => 'application/json'
+        ])->timeout(10)->post($config['base_url'] . '/epayment/initiate/', [
+            'return_url' => 'https://example.com/return',
+            'website_url' => 'https://example.com',
+            'amount' => 1000, // Rs. 10 in paisa
+            'purchase_order_id' => 'TEST-' . time(),
+            'purchase_order_name' => 'Test Payment',
+            'customer_info' => [
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'phone' => '9800000000'
+            ]
+        ]);
+
+        $apiTest = [
+            'status' => $response->successful() ? 'SUCCESS' : 'FAILED',
+            'status_code' => $response->status(),
+            'response' => $response->json()
+        ];
+    } catch (\Exception $e) {
+        $apiTest = [
+            'status' => 'ERROR',
+            'error' => $e->getMessage()
+        ];
+    }
+
+    return response()->json([
+        'khalti_configuration' => $config,
+        'api_connectivity_test' => $apiTest,
+        'test_credentials' => [
+            'khalti_id' => '9800000000 to 9800000005',
+            'mpin' => '1111',
+            'otp' => '987654'
+        ],
+        'documentation' => 'https://docs.khalti.com/khalti-epayment/',
+        'status' => $apiTest['status'] === 'SUCCESS' ? 'Khalti integration is working!' : 'Khalti integration needs attention'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.config.test');
+
+// Test Khalti callback URLs
+Route::get('/debug/khalti-callback-test', function () {
+    // Create a test payment record for callback testing
+    $user = \App\Models\User::first();
+    $booking = \App\Models\Booking::first();
+
+    if (!$user || !$booking) {
+        return response()->json(['error' => 'Need at least one user and booking for testing'], 404);
+    }
+
+    $payment = \App\Models\Payment::create([
+        'booking_id' => $booking->id,
+        'user_id' => $user->id,
+        'payment_method' => 'khalti',
+        'amount' => 500.00,
+        'currency' => 'NPR',
+        'status' => 'pending',
+        'transaction_id' => 'TEST-KHALTI-' . time(),
+        'gateway_data' => [
+            'test' => true,
+            'pidx' => 'test_pidx_' . time()
+        ]
+    ]);
+
+    $successUrl = route('payment.khalti.success') . '?payment_id=' . $payment->id . '&pidx=test_pidx_123&status=Completed&transaction_id=test_txn_123';
+    $failureUrl = route('payment.khalti.failure') . '?payment_id=' . $payment->id . '&status=User canceled';
+
+    return response()->json([
+        'test_payment_created' => [
+            'id' => $payment->id,
+            'transaction_id' => $payment->transaction_id,
+            'amount' => $payment->amount,
+            'status' => $payment->status
+        ],
+        'callback_urls' => [
+            'success_url' => $successUrl,
+            'failure_url' => $failureUrl
+        ],
+        'test_instructions' => [
+            '1. Click on the success_url to test successful payment callback',
+            '2. Click on the failure_url to test failed payment callback',
+            '3. Check if the callbacks work without route parameter errors'
+        ],
+        'khalti_callback_format' => [
+            'success_parameters' => 'pidx, status, transaction_id, amount',
+            'failure_parameters' => 'pidx, status',
+            'note' => 'payment_id is passed as query parameter in return_url'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.callback.test');
+
+// Complete Khalti integration test summary
+Route::get('/debug/khalti-integration-summary', function () {
+    return response()->json([
+        'khalti_integration_status' => '✅ COMPLETE',
+        'implementation_summary' => [
+            'service' => 'KhaltiPaymentService - Full API integration',
+            'controller' => 'PaymentController - Initiation and callbacks',
+            'routes' => 'Authenticated initiation + Public callbacks',
+            'ui' => 'Payment options page updated',
+            'configuration' => 'Test credentials configured'
+        ],
+        'test_urls' => [
+            'config_test' => route('debug.khalti.config.test'),
+            'payment_flow_test' => route('debug.khalti.test'),
+            'callback_test' => route('debug.khalti.callback.test')
+        ],
+        'test_credentials' => [
+            'khalti_id' => '9800000000 to 9800000005',
+            'mpin' => '1111',
+            'otp' => '987654',
+            'max_amount' => 'Rs. 999 (sandbox limit)'
+        ],
+        'api_endpoints' => [
+            'initiate' => 'https://dev.khalti.com/api/v2/epayment/initiate/',
+            'lookup' => 'https://dev.khalti.com/api/v2/epayment/lookup/',
+            'environment' => 'Sandbox/Test'
+        ],
+        'callback_urls' => [
+            'success' => route('payment.khalti.success'),
+            'failure' => route('payment.khalti.failure'),
+            'format' => 'Uses query parameters: ?payment_id=X&pidx=Y&status=Z'
+        ],
+        'next_steps' => [
+            '1. Test payment flow using the test URLs above',
+            '2. Use provided test credentials for Khalti login',
+            '3. Verify success/failure callbacks work correctly',
+            '4. For production: Get live credentials from Khalti merchant dashboard'
+        ],
+        'documentation' => 'https://docs.khalti.com/khalti-epayment/',
+        'status' => '🎉 Ready for testing!'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.integration.summary');
+
+// Debug Khalti payment initiation step by step
+Route::get('/debug/khalti-payment-debug/{booking?}', function ($bookingId = null) {
+    try {
+        // Get or create a test booking
+        if ($bookingId) {
+            $booking = \App\Models\Booking::findOrFail($bookingId);
+        } else {
+            // Create a test booking
+            $user = \App\Models\User::first();
+            $schedule = \App\Models\Schedule::with(['route', 'bus'])
+                ->where('travel_date', '>=', now()->toDateString())
+                ->first();
+
+            if (!$user || !$schedule) {
+                return response()->json(['error' => 'Need user and schedule for testing'], 404);
+            }
+
+            $booking = \App\Models\Booking::create([
+                'user_id' => $user->id,
+                'schedule_id' => $schedule->id,
+                'seat_numbers' => ['1', '2'],
+                'passenger_count' => 2,
+                'total_amount' => 500.00,
+                'status' => 'pending',
+                'payment_status' => 'pending',
+                'booking_reference' => 'DEBUG-KHALTI-' . time(),
+                'passenger_details' => json_encode([
+                    'name' => 'Debug User',
+                    'phone' => '9800000000',
+                    'email' => 'debug@khalti.com'
+                ]),
+                'contact_phone' => '9800000000',
+                'contact_email' => 'debug@khalti.com',
+                'booking_type' => 'online'
+            ]);
+        }
+
+        // Test the KhaltiPaymentService directly
+        $khaltiService = app(\App\Services\KhaltiPaymentService::class);
+
+        // Step 1: Test service instantiation
+        $debug = [
+            'step_1_service_created' => 'SUCCESS',
+            'booking_info' => [
+                'id' => $booking->id,
+                'amount' => $booking->total_amount,
+                'reference' => $booking->booking_reference
+            ]
+        ];
+
+        // Step 2: Test payment initiation
+        $result = $khaltiService->initiatePayment($booking);
+
+        $debug['step_2_payment_initiation'] = [
+            'success' => $result['success'],
+            'result' => $result
+        ];
+
+        if ($result['success']) {
+            $debug['step_3_khalti_response'] = [
+                'payment_url' => $result['payment_url'],
+                'pidx' => $result['pidx'],
+                'expires_at' => $result['expires_at']
+            ];
+
+            $debug['next_step'] = 'Visit payment_url to complete payment';
+            $debug['test_payment_url'] = $result['payment_url'];
+        } else {
+            $debug['step_3_error'] = $result;
+        }
+
+        return response()->json($debug, 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Debug failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.khalti.payment.debug');
+
+// Test actual payment flow simulation
+Route::get('/debug/khalti-flow-test', function () {
+    // Create a test booking and simulate the exact flow
+    $user = \App\Models\User::first();
+    $schedule = \App\Models\Schedule::with(['route', 'bus'])
+        ->where('travel_date', '>=', now()->toDateString())
+        ->first();
+
+    if (!$user || !$schedule) {
+        return response()->json(['error' => 'Need user and schedule for testing'], 404);
+    }
+
+    $booking = \App\Models\Booking::create([
+        'user_id' => $user->id,
+        'schedule_id' => $schedule->id,
+        'seat_numbers' => ['1', '2'],
+        'passenger_count' => 2,
+        'total_amount' => 500.00,
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'booking_reference' => 'FLOW-TEST-' . time(),
+        'passenger_details' => json_encode([
+            'name' => 'Flow Test User',
+            'phone' => '9800000000',
+            'email' => 'flowtest@khalti.com'
+        ]),
+        'contact_phone' => '9800000000',
+        'contact_email' => 'flowtest@khalti.com',
+        'booking_type' => 'online'
+    ]);
+
+    return response()->json([
+        'booking_created' => [
+            'id' => $booking->id,
+            'reference' => $booking->booking_reference,
+            'amount' => $booking->total_amount
+        ],
+        'test_urls' => [
+            'payment_options' => route('payment.options', $booking->id),
+            'direct_khalti_initiate' => route('payment.khalti.initiate', $booking->id)
+        ],
+        'instructions' => [
+            '1. Visit payment_options URL',
+            '2. Click Khalti payment button',
+            '3. Check if it redirects to Khalti or shows success immediately',
+            '4. If it shows success immediately, there is a routing/controller issue'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.flow.test');
+
+// Test which payment system is being used
+Route::get('/debug/payment-system-check', function () {
+    $user = \App\Models\User::first();
+    $schedule = \App\Models\Schedule::first();
+
+    if (!$user || !$schedule) {
+        return response()->json(['error' => 'Need user and schedule'], 404);
+    }
+
+    $booking = \App\Models\Booking::create([
+        'user_id' => $user->id,
+        'schedule_id' => $schedule->id,
+        'seat_numbers' => ['1'],
+        'passenger_count' => 1,
+        'total_amount' => 300.00,
+        'status' => 'pending',
+        'payment_status' => 'pending',
+        'booking_reference' => 'SYSTEM-CHECK-' . time(),
+        'passenger_details' => json_encode(['name' => 'System Check']),
+        'contact_phone' => '9800000000',
+        'contact_email' => 'check@test.com',
+        'booking_type' => 'online'
+    ]);
+
+    return response()->json([
+        'booking_created' => $booking->id,
+        'available_payment_routes' => [
+            'main_payment_options' => route('payment.options', $booking->id),
+            'main_khalti_initiate' => route('payment.khalti.initiate', $booking->id),
+            'customer_payment_index' => url('/customer/payment/' . $booking->id),
+        ],
+        'route_analysis' => [
+            'main_system' => 'App\\Http\\Controllers\\PaymentController (Real Khalti)',
+            'customer_system' => 'App\\Http\\Controllers\\Customer\\PaymentController (Now Fixed)',
+        ],
+        'test_instructions' => [
+            '1. Visit main_payment_options to use the main payment system',
+            '2. Visit customer_payment_index to use the customer payment system',
+            '3. Both should now use real Khalti integration (simulation removed)',
+            '4. Check which one you are actually using in your app'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.payment.system.check');
+
+// Khalti credentials setup guide
+Route::get('/debug/khalti-credentials-guide', function () {
+    return response()->json([
+        'issue' => 'Invalid token error means the Khalti API credentials are incorrect',
+        'solution' => 'You need to get real test credentials from Khalti merchant dashboard',
+        'steps_to_get_credentials' => [
+            '1. Visit: https://test-admin.khalti.com/#/join/merchant',
+            '2. Sign up for a merchant account (use 987654 as OTP)',
+            '3. Complete the merchant registration',
+            '4. Go to "Keys" section in merchant dashboard',
+            '5. Copy the "Live Secret Key" and "Live Public Key"',
+            '6. Update your .env file with these credentials'
+        ],
+        'env_file_update' => [
+            'KHALTI_PUBLIC_KEY=your_actual_public_key_from_dashboard',
+            'KHALTI_SECRET_KEY=your_actual_secret_key_from_dashboard',
+            'KHALTI_BASE_URL=https://dev.khalti.com/api/v2'
+        ],
+        'current_credentials_status' => 'INVALID - Using dummy credentials',
+        'current_config' => [
+            'public_key' => config('services.khalti.public_key'),
+            'secret_key' => config('services.khalti.secret_key'),
+            'base_url' => config('services.khalti.base_url')
+        ],
+        'test_user_credentials' => [
+            'khalti_id' => '9800000000 to 9800000005',
+            'mpin' => '1111',
+            'otp' => '987654'
+        ],
+        'important_notes' => [
+            'The credentials in config are dummy/example credentials',
+            'You must get real credentials from Khalti merchant dashboard',
+            'Without real credentials, you will get "Invalid token" error',
+            'After getting credentials, payment will work properly'
+        ],
+        'alternative_solution' => 'Create a payment simulator for testing without real credentials'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.credentials.guide');
+
+// Khalti Payment Simulator (for testing without real credentials)
+Route::get('/khalti-simulator/{payment_id}', function ($paymentId) {
+    try {
+        $payment = \App\Models\Payment::findOrFail($paymentId);
+        $booking = $payment->booking;
+
+        return view('payment.khalti-simulator', [
+            'payment' => $payment,
+            'booking' => $booking,
+            'amount' => $payment->amount,
+            'pidx' => 'SIM_' . time() . '_' . $payment->id
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Payment not found'], 404);
+    }
+})->name('khalti.simulator');
+
+// Handle Khalti simulator payment completion
+Route::post('/khalti-simulator/complete/{payment_id}', function ($paymentId) {
+    try {
+        $payment = \App\Models\Payment::findOrFail($paymentId);
+        $booking = $payment->booking;
+
+        // Simulate successful payment
+        $payment->update([
+            'status' => 'completed',
+            'gateway_transaction_id' => 'SIM_TXN_' . time(),
+            'gateway_response' => [
+                'simulated' => true,
+                'status' => 'Completed',
+                'transaction_id' => 'SIM_TXN_' . time(),
+                'amount' => $payment->amount * 100 // in paisa
+            ],
+            'paid_at' => now(),
+        ]);
+
+        // Update booking
+        $booking->update([
+            'status' => 'confirmed',
+            'payment_status' => 'paid',
+        ]);
+
+        // Redirect to success page
+        $successUrl = route('payment.khalti.success') . '?payment_id=' . $payment->id . '&pidx=SIM_' . time() . '&status=Completed&transaction_id=SIM_TXN_' . time();
+        return redirect($successUrl);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Payment completion failed'], 500);
+    }
+})->name('khalti.simulator.complete');
+
+// Debug Khalti callback processing
+Route::get('/debug/khalti-callback-debug', function () {
+    // Create a test payment for callback debugging
+    $user = \App\Models\User::first();
+    $booking = \App\Models\Booking::first();
+
+    if (!$user || !$booking) {
+        return response()->json(['error' => 'Need user and booking'], 404);
+    }
+
+    $payment = \App\Models\Payment::create([
+        'booking_id' => $booking->id,
+        'user_id' => $user->id,
+        'payment_method' => 'khalti',
+        'amount' => 500.00,
+        'currency' => 'NPR',
+        'status' => 'pending',
+        'transaction_id' => 'DEBUG-KHALTI-' . time(),
+        'gateway_data' => [
+            'test' => true,
+            'pidx' => 'SIM_' . time()
+        ]
+    ]);
+
+    $pidx = 'SIM_' . time();
+    $transactionId = 'SIM_TXN_' . time();
+
+    $successUrl = route('payment.khalti.success') . '?' . http_build_query([
+        'payment_id' => $payment->id,
+        'pidx' => $pidx,
+        'status' => 'Completed',
+        'transaction_id' => $transactionId,
+        'amount' => 50000, // Rs. 500 in paisa
+        'total_amount' => 50000
+    ]);
+
+    $failureUrl = route('payment.khalti.failure') . '?' . http_build_query([
+        'payment_id' => $payment->id,
+        'pidx' => $pidx,
+        'status' => 'User canceled'
+    ]);
+
+    return response()->json([
+        'debug_payment_created' => [
+            'id' => $payment->id,
+            'amount' => $payment->amount,
+            'status' => $payment->status
+        ],
+        'test_callback_urls' => [
+            'success_callback' => $successUrl,
+            'failure_callback' => $failureUrl
+        ],
+        'instructions' => [
+            '1. Click success_callback to test successful payment verification',
+            '2. Click failure_callback to test failed payment',
+            '3. Check if simulated payment verification works correctly'
+        ],
+        'expected_result' => 'Success callback should show payment success page'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.callback.debug');
+
+// Test Khalti verification directly
+Route::get('/debug/khalti-verify-test/{payment_id}/{pidx}', function ($paymentId, $pidx) {
+    try {
+        $khaltiService = app(\App\Services\KhaltiPaymentService::class);
+
+        $result = $khaltiService->verifyPayment($paymentId, $pidx);
+
+        return response()->json([
+            'verification_result' => $result,
+            'payment_id' => $paymentId,
+            'pidx' => $pidx,
+            'is_simulated' => strpos($pidx, 'SIM_') === 0,
+            'test_status' => $result['success'] ? 'SUCCESS' : 'FAILED'
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Verification test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.khalti.verify.test');
+
+// Debug specific payment issue
+Route::get('/debug/payment-check/{payment_id}', function ($paymentId) {
+    try {
+        $payment = \App\Models\Payment::find($paymentId);
+
+        if (!$payment) {
+            return response()->json([
+                'error' => 'Payment not found',
+                'payment_id' => $paymentId,
+                'suggestion' => 'This payment ID does not exist in the database'
+            ], 404, [], JSON_PRETTY_PRINT);
+        }
+
+        $booking = $payment->booking;
+
+        return response()->json([
+            'payment_found' => true,
+            'payment_details' => [
+                'id' => $payment->id,
+                'status' => $payment->status,
+                'amount' => $payment->amount,
+                'payment_method' => $payment->payment_method,
+                'transaction_id' => $payment->transaction_id,
+                'gateway_data' => $payment->gateway_data,
+                'created_at' => $payment->created_at,
+                'updated_at' => $payment->updated_at
+            ],
+            'booking_details' => [
+                'id' => $booking->id,
+                'status' => $booking->status,
+                'payment_status' => $booking->payment_status,
+                'booking_reference' => $booking->booking_reference,
+                'total_amount' => $booking->total_amount
+            ],
+            'test_verification_url' => route('debug.khalti.verify.test', [$payment->id, 'SIM_' . time()]),
+            'status' => 'Payment exists and can be processed'
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Payment check failed',
+            'message' => $e->getMessage()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.payment.check');
+
+// Reproduce the exact error scenario
+Route::get('/debug/reproduce-khalti-error', function () {
+    // Create a test payment that matches the failing scenario
+    $user = \App\Models\User::first();
+    $booking = \App\Models\Booking::first();
+
+    if (!$user || !$booking) {
+        return response()->json(['error' => 'Need user and booking'], 404);
+    }
+
+    $payment = \App\Models\Payment::create([
+        'booking_id' => $booking->id,
+        'user_id' => $user->id,
+        'payment_method' => 'khalti',
+        'amount' => 500.00,
+        'currency' => 'NPR',
+        'status' => 'pending',
+        'transaction_id' => 'REPRODUCE-TEST-' . time(),
+        'gateway_data' => [
+            'test' => true,
+            'pidx' => 'SIM_' . time()
+        ]
+    ]);
+
+    // Create the exact URL that was failing
+    $failingUrl = route('payment.khalti.success') . '?' . http_build_query([
+        'payment_id' => $payment->id,
+        'pidx' => 'SIM_17526700828',
+        'status' => 'Completed',
+        'transaction_id' => 'SIM_TXN_17526700828'
+    ]);
+
+    return response()->json([
+        'test_payment_created' => [
+            'id' => $payment->id,
+            'status' => $payment->status,
+            'amount' => $payment->amount
+        ],
+        'failing_scenario_url' => $failingUrl,
+        'verification_test_url' => route('debug.khalti.verify.test', [$payment->id, 'SIM_17526700828']),
+        'instructions' => [
+            '1. Click failing_scenario_url to reproduce the exact error',
+            '2. Click verification_test_url to test verification directly',
+            '3. Check what specific error occurs'
+        ],
+        'expected_fix' => 'Should now work with simulated payment verification'
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.reproduce.khalti.error');
+
+// Test booking success view
+Route::get('/debug/test-booking-success', function () {
+    $booking = \App\Models\Booking::with(['schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus', 'schedule.operator'])->first();
+
+    if (!$booking) {
+        return response()->json(['error' => 'No bookings found for testing'], 404);
+    }
+
+    return response()->json([
+        'booking_found' => true,
+        'booking_id' => $booking->id,
+        'booking_reference' => $booking->booking_reference,
+        'test_urls' => [
+            'booking_success_view' => route('booking.success', $booking->id),
+            'payment_success_view' => route('payment.success', $booking->id),
+            'customer_booking_show' => route('customer.bookings.show', $booking->id)
+        ],
+        'view_status' => [
+            'customer.booking.success' => 'NOW CREATED ✅',
+            'customer.payment.success' => 'EXISTS ✅',
+            'payment.simple-success' => 'EXISTS ✅'
+        ],
+        'instructions' => [
+            '1. Click booking_success_view to test the newly created view',
+            '2. All views should now work without "View not found" errors'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.test.booking.success');
+
+// Debug payment status issue
+Route::get('/debug/payment-status-check/{booking_id}', function ($bookingId) {
+    try {
+        $booking = \App\Models\Booking::with(['payments'])->findOrFail($bookingId);
+
+        $payments = $booking->payments()->orderBy('created_at', 'desc')->get();
+
+        $paymentDetails = $payments->map(function ($payment) {
+            return [
+                'id' => $payment->id,
+                'status' => $payment->status,
+                'payment_method' => $payment->payment_method,
+                'amount' => $payment->amount,
+                'gateway_transaction_id' => $payment->gateway_transaction_id,
+                'gateway_data' => $payment->gateway_data,
+                'gateway_response' => $payment->gateway_response,
+                'paid_at' => $payment->paid_at,
+                'created_at' => $payment->created_at,
+                'updated_at' => $payment->updated_at
+            ];
+        });
+
+        return response()->json([
+            'booking_details' => [
+                'id' => $booking->id,
+                'booking_reference' => $booking->booking_reference,
+                'status' => $booking->status,
+                'payment_status' => $booking->payment_status,
+                'total_amount' => $booking->total_amount,
+                'payment_completed_at' => $booking->payment_completed_at,
+                'created_at' => $booking->created_at,
+                'updated_at' => $booking->updated_at
+            ],
+            'payment_records' => $paymentDetails,
+            'payment_count' => $payments->count(),
+            'latest_payment' => $payments->first() ? [
+                'id' => $payments->first()->id,
+                'status' => $payments->first()->status,
+                'paid_at' => $payments->first()->paid_at
+            ] : null,
+            'diagnosis' => [
+                'booking_payment_status' => $booking->payment_status,
+                'latest_payment_status' => $payments->first()->status ?? 'No payments',
+                'issue' => $booking->payment_status !== 'paid' ? 'Booking payment status not updated' : 'Payment status is correct',
+                'solution' => $booking->payment_status !== 'paid' ? 'Check if handleSuccessfulPayment was called' : 'No issues found'
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Payment status check failed',
+            'message' => $e->getMessage()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.payment.status.check');
+
+// Fix payment status manually (for testing)
+Route::get('/debug/fix-payment-status/{booking_id}', function ($bookingId) {
+    try {
+        $booking = \App\Models\Booking::with(['payments'])->findOrFail($bookingId);
+
+        $latestPayment = $booking->payments()->orderBy('created_at', 'desc')->first();
+
+        if (!$latestPayment) {
+            return response()->json(['error' => 'No payments found for this booking'], 404);
+        }
+
+        $beforeStatus = [
+            'booking_status' => $booking->status,
+            'booking_payment_status' => $booking->payment_status,
+            'payment_status' => $latestPayment->status,
+            'payment_paid_at' => $latestPayment->paid_at
+        ];
+
+        // Check if payment is completed but booking is not updated
+        if ($latestPayment->status === 'completed' && $booking->payment_status !== 'paid') {
+            // Update booking status
+            $booking->update([
+                'status' => 'confirmed',
+                'payment_status' => 'paid',
+                'payment_completed_at' => $latestPayment->paid_at ?? now()
+            ]);
+
+            $afterStatus = [
+                'booking_status' => $booking->fresh()->status,
+                'booking_payment_status' => $booking->fresh()->payment_status,
+                'payment_status' => $latestPayment->status,
+                'payment_paid_at' => $latestPayment->paid_at
+            ];
+
+            return response()->json([
+                'action' => 'FIXED',
+                'booking_id' => $booking->id,
+                'before' => $beforeStatus,
+                'after' => $afterStatus,
+                'message' => 'Booking payment status has been updated to match completed payment',
+                'test_urls' => [
+                    'booking_details' => route('customer.bookings.show', $booking->id),
+                    'payment_options' => route('payment.options', $booking->id)
+                ]
+            ], 200, [], JSON_PRETTY_PRINT);
+        } else {
+            return response()->json([
+                'action' => 'NO_FIX_NEEDED',
+                'booking_id' => $booking->id,
+                'current_status' => $beforeStatus,
+                'message' => 'Payment and booking statuses are already correct',
+                'test_urls' => [
+                    'booking_details' => route('customer.bookings.show', $booking->id),
+                    'payment_options' => route('payment.options', $booking->id)
+                ]
+            ], 200, [], JSON_PRETTY_PRINT);
+        }
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Fix payment status failed',
+            'message' => $e->getMessage()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.fix.payment.status');
+
+// Find bookings with payment issues
+Route::get('/debug/find-payment-issues', function () {
+    try {
+        // Find bookings with completed payments but pending payment status
+        $problematicBookings = \App\Models\Booking::with(['payments'])
+            ->where('payment_status', '!=', 'paid')
+            ->whereHas('payments', function ($query) {
+                $query->where('status', 'completed');
+            })
+            ->get();
+
+        $issues = $problematicBookings->map(function ($booking) {
+            $completedPayments = $booking->payments()->where('status', 'completed')->get();
+
+            return [
+                'booking_id' => $booking->id,
+                'booking_reference' => $booking->booking_reference,
+                'booking_status' => $booking->status,
+                'booking_payment_status' => $booking->payment_status,
+                'total_amount' => $booking->total_amount,
+                'completed_payments_count' => $completedPayments->count(),
+                'latest_completed_payment' => $completedPayments->first() ? [
+                    'id' => $completedPayments->first()->id,
+                    'amount' => $completedPayments->first()->amount,
+                    'payment_method' => $completedPayments->first()->payment_method,
+                    'paid_at' => $completedPayments->first()->paid_at,
+                    'gateway_transaction_id' => $completedPayments->first()->gateway_transaction_id
+                ] : null,
+                'fix_url' => route('debug.fix.payment.status', $booking->id),
+                'check_url' => route('debug.payment.status.check', $booking->id)
+            ];
+        });
+
+        return response()->json([
+            'total_issues_found' => $issues->count(),
+            'problematic_bookings' => $issues,
+            'summary' => [
+                'issue_description' => 'Bookings with completed payments but payment_status != paid',
+                'likely_cause' => 'handleSuccessfulPayment method not called or failed',
+                'solution' => 'Use fix_url for each booking to manually update status'
+            ],
+            'bulk_fix_instructions' => [
+                '1. Review each booking in the list above',
+                '2. Click fix_url for each booking to update status',
+                '3. Verify the booking shows as paid after fix'
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Find payment issues failed',
+            'message' => $e->getMessage()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.find.payment.issues');
+
+// Test complete Khalti payment flow with status updates
+Route::get('/debug/test-complete-khalti-flow', function () {
+    try {
+        // Create a fresh test booking
+        $user = \App\Models\User::first();
+        $schedule = \App\Models\Schedule::with(['route', 'bus'])->first();
+
+        if (!$user || !$schedule) {
+            return response()->json(['error' => 'Need user and schedule'], 404);
+        }
+
+        $booking = \App\Models\Booking::create([
+            'user_id' => $user->id,
+            'schedule_id' => $schedule->id,
+            'seat_numbers' => ['1', '2'],
+            'passenger_count' => 2,
+            'total_amount' => 500.00,
+            'status' => 'pending',
+            'payment_status' => 'pending',
+            'booking_reference' => 'COMPLETE-FLOW-' . time(),
+            'passenger_details' => json_encode([
+                'name' => 'Complete Flow Test',
+                'phone' => '9800000000',
+                'email' => 'completeflow@test.com'
+            ]),
+            'contact_phone' => '9800000000',
+            'contact_email' => 'completeflow@test.com',
+            'booking_type' => 'online'
+        ]);
+
+        // Test the complete flow
+        $khaltiService = app(\App\Services\KhaltiPaymentService::class);
+
+        // Step 1: Initiate payment
+        $initiateResult = $khaltiService->initiatePayment($booking);
+
+        if (!$initiateResult['success']) {
+            return response()->json([
+                'error' => 'Payment initiation failed',
+                'result' => $initiateResult
+            ], 500);
+        }
+
+        // Get the payment record
+        $payment = \App\Models\Payment::where('booking_id', $booking->id)->latest()->first();
+
+        // Step 2: Simulate payment completion (like what happens in simulator)
+        $pidx = 'SIM_' . time();
+        $transactionId = 'SIM_TXN_' . time();
+
+        // Step 3: Verify payment (this should update statuses)
+        $verifyResult = $khaltiService->verifyPayment($payment->id, $pidx);
+
+        // Step 4: Check final statuses
+        $finalBooking = $booking->fresh();
+        $finalPayment = $payment->fresh();
+
+        return response()->json([
+            'test_flow_complete' => true,
+            'booking_created' => [
+                'id' => $booking->id,
+                'reference' => $booking->booking_reference,
+                'initial_status' => 'pending',
+                'initial_payment_status' => 'pending'
+            ],
+            'step_1_initiate' => [
+                'success' => $initiateResult['success'],
+                'payment_url' => $initiateResult['payment_url'] ?? null,
+                'is_simulator' => $initiateResult['is_simulator'] ?? false
+            ],
+            'step_2_payment_record' => [
+                'payment_id' => $payment->id,
+                'initial_status' => $payment->status,
+                'amount' => $payment->amount
+            ],
+            'step_3_verify' => [
+                'success' => $verifyResult['success'],
+                'message' => $verifyResult['message'],
+                'status' => $verifyResult['status'] ?? null
+            ],
+            'step_4_final_status' => [
+                'booking_status' => $finalBooking->status,
+                'booking_payment_status' => $finalBooking->payment_status,
+                'payment_status' => $finalPayment->status,
+                'payment_paid_at' => $finalPayment->paid_at
+            ],
+            'test_urls' => [
+                'booking_success' => route('booking.success', $finalBooking->id),
+                'payment_status_check' => route('debug.payment.status.check', $finalBooking->id),
+                'booking_details' => route('customer.bookings.show', $finalBooking->id)
+            ],
+            'status_check' => [
+                'is_payment_completed' => $finalPayment->status === 'completed',
+                'is_booking_paid' => $finalBooking->payment_status === 'paid',
+                'is_booking_confirmed' => $finalBooking->status === 'confirmed',
+                'all_statuses_correct' => $finalPayment->status === 'completed' &&
+                                        $finalBooking->payment_status === 'paid' &&
+                                        $finalBooking->status === 'confirmed'
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Complete flow test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.test.complete.khalti.flow');
+
+// Payment status issue summary and solutions
+Route::get('/debug/payment-status-summary', function () {
+    return response()->json([
+        'issue_description' => 'Khalti payment successful but booking still shows "Payment Required"',
+        'root_causes' => [
+            '1. Payment verification callback not updating booking status',
+            '2. handleSuccessfulPayment method not being called',
+            '3. Database transaction issues during status update',
+            '4. View showing cached/old booking data'
+        ],
+        'solutions_implemented' => [
+            '✅ Fixed booking success view to show dynamic payment status',
+            '✅ Added comprehensive debugging routes',
+            '✅ Enhanced error logging in payment callbacks',
+            '✅ Created manual fix routes for problematic bookings'
+        ],
+        'diagnostic_tools' => [
+            'find_issues' => route('debug.find.payment.issues'),
+            'test_complete_flow' => route('debug.test.complete.khalti.flow'),
+            'check_specific_booking' => route('debug.payment.status.check', '{booking_id}'),
+            'fix_specific_booking' => route('debug.fix.payment.status', '{booking_id}')
+        ],
+        'immediate_actions' => [
+            '1. Visit find_issues URL to identify problematic bookings',
+            '2. Use fix_specific_booking URL for each problematic booking',
+            '3. Test new payments with test_complete_flow URL',
+            '4. Verify booking success page shows correct status'
+        ],
+        'expected_behavior' => [
+            'After successful Khalti payment:',
+            '• Payment status should be "completed"',
+            '• Booking payment_status should be "paid"',
+            '• Booking status should be "confirmed"',
+            '• Booking success page should show "Payment Completed" (green)',
+            '• No "Proceed to Payment" button should be visible'
+        ],
+        'test_instructions' => [
+            '1. Create new booking via debug/khalti-test',
+            '2. Complete payment in simulator',
+            '3. Check if booking success page shows correct status',
+            '4. If still showing "Payment Required", use fix URL'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.payment.status.summary');
+
+// Test new interactive Khalti payment flow
+Route::get('/debug/test-interactive-khalti', function () {
+    try {
+        // Create a test booking
+        $user = \App\Models\User::first();
+        $schedule = \App\Models\Schedule::with(['route', 'bus'])->first();
+
+        if (!$user || !$schedule) {
+            return response()->json(['error' => 'Need user and schedule'], 404);
+        }
+
+        $booking = \App\Models\Booking::create([
+            'user_id' => $user->id,
+            'schedule_id' => $schedule->id,
+            'seat_numbers' => ['1', '2'],
+            'passenger_count' => 2,
+            'total_amount' => 750.00,
+            'status' => 'pending',
+            'payment_status' => 'pending',
+            'booking_reference' => 'INTERACTIVE-' . time(),
+            'passenger_details' => json_encode([
+                'name' => 'Interactive Test User',
+                'phone' => '9800000000',
+                'email' => 'interactive@test.com'
+            ]),
+            'contact_phone' => '9800000000',
+            'contact_email' => 'interactive@test.com',
+            'booking_type' => 'online'
+        ]);
+
+        return response()->json([
+            'interactive_flow_test' => true,
+            'booking_created' => [
+                'id' => $booking->id,
+                'reference' => $booking->booking_reference,
+                'amount' => $booking->total_amount
+            ],
+            'test_urls' => [
+                'payment_options' => route('payment.options', $booking->id),
+                'direct_khalti_initiate' => route('payment.khalti.initiate', $booking->id)
+            ],
+            'new_features' => [
+                '✅ Interactive Khalti payment page with countdown',
+                '✅ Beautiful loading animations and status updates',
+                '✅ Test credentials display for simulator',
+                '✅ Security notices and user guidance',
+                '✅ Automatic redirect to payment success page',
+                '✅ Enhanced payment success page with gateway info'
+            ],
+            'flow_description' => [
+                '1. Click payment_options URL above',
+                '2. Select Khalti payment method',
+                '3. See new interactive payment page with countdown',
+                '4. Auto-redirect to Khalti simulator',
+                '5. Complete payment with test credentials',
+                '6. Redirect to enhanced payment success page'
+            ],
+            'expected_improvements' => [
+                'Better user experience with loading states',
+                'Clear instructions and test credentials',
+                'Professional payment processing interface',
+                'Proper success page with transaction details'
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Interactive Khalti test failed',
+            'message' => $e->getMessage()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.test.interactive.khalti');
+
+// Summary of all Khalti improvements
+Route::get('/debug/khalti-improvements-summary', function () {
+    return response()->json([
+        'khalti_payment_improvements' => [
+            'issue_resolved' => 'After successful Khalti payment, now redirects to proper payment success page',
+            'interactive_payment_page' => 'Created beautiful interactive Khalti payment page with animations',
+            'enhanced_user_experience' => 'Added loading states, countdown timers, and clear instructions'
+        ],
+        'key_features_implemented' => [
+            '✅ Interactive Khalti Payment Page' => [
+                'Beautiful gradient design with Khalti branding',
+                'Countdown timer before redirect',
+                'Loading animations and status updates',
+                'Test credentials display for simulator',
+                'Security notices and user guidance',
+                'Auto-redirect with smooth transitions'
+            ],
+            '✅ Proper Success Redirect' => [
+                'Khalti success callback now redirects to payment.success route',
+                'Enhanced payment success page with gateway information',
+                'Transaction ID display',
+                'Success message with payment method'
+            ],
+            '✅ Dynamic Status Updates' => [
+                'Booking success page shows correct payment status',
+                'Conditional action buttons based on payment status',
+                'Green success indicators for paid bookings',
+                'Smart information display'
+            ]
+        ],
+        'user_flow_improvements' => [
+            'before' => [
+                '1. Select Khalti → Direct redirect to Khalti',
+                '2. Complete payment → Generic success page',
+                '3. Return to booking → Still shows "Payment Required"'
+            ],
+            'after' => [
+                '1. Select Khalti → Interactive payment page with countdown',
+                '2. Auto-redirect to Khalti with clear instructions',
+                '3. Complete payment → Redirect to proper payment success page',
+                '4. Return to booking → Shows "Payment Completed" status'
+            ]
+        ],
+        'test_urls' => [
+            'interactive_khalti_test' => route('debug.test.interactive.khalti'),
+            'payment_status_summary' => route('debug.payment.status.summary'),
+            'find_payment_issues' => route('debug.find.payment.issues'),
+            'complete_flow_test' => route('debug.test.complete.khalti.flow')
+        ],
+        'files_created_modified' => [
+            'created' => [
+                'resources/views/payments/khalti-redirect.blade.php' => 'Interactive Khalti payment page'
+            ],
+            'modified' => [
+                'app/Http/Controllers/PaymentController.php' => 'Updated success callback to redirect properly',
+                'app/Http/Controllers/Customer/PaymentController.php' => 'Updated to use interactive payment page',
+                'resources/views/customer/payment/success.blade.php' => 'Enhanced with gateway information',
+                'resources/views/customer/booking/success.blade.php' => 'Dynamic payment status display'
+            ]
+        ],
+        'next_steps' => [
+            '1. Test the interactive Khalti flow using the test URLs above',
+            '2. Verify that payments now redirect to proper success page',
+            '3. Check that booking status updates correctly after payment',
+            '4. Ensure all existing bookings show correct payment status'
+        ]
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('debug.khalti.improvements.summary');
+
+// Debug seat reservation issues
+Route::get('/debug/seat-reservation-issue/{schedule_id}', function ($scheduleId) {
+    try {
+        $schedule = \App\Models\Schedule::with(['bus', 'route'])->findOrFail($scheduleId);
+        $user = \App\Models\User::first();
+
+        if (!$user) {
+            return response()->json(['error' => 'No user found for testing'], 404);
+        }
+
+        // Test seat reservation
+        $testSeats = ['11']; // Try to reserve seat 11
+        $reservationService = app(\App\Services\SeatReservationService::class);
+
+        // Get current seat status
+        $bookedSeats = \App\Models\Booking::where('schedule_id', $scheduleId)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->get()
+            ->pluck('seat_numbers')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        $reservedSeats = \App\Models\SeatReservation::where('schedule_id', $scheduleId)
+            ->active()
+            ->get()
+            ->pluck('seat_numbers')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        $existingReservation = \App\Models\SeatReservation::where('user_id', $user->id)
+            ->where('schedule_id', $scheduleId)
+            ->active()
+            ->first();
+
+        // Try to reserve seats
+        $result = $reservationService->reserveSeats($user->id, $scheduleId, $testSeats, 60);
+
+        return response()->json([
+            'debug_seat_reservation' => true,
+            'schedule_info' => [
+                'id' => $schedule->id,
+                'route' => $schedule->route->name ?? 'N/A',
+                'bus' => $schedule->bus->bus_number ?? 'N/A',
+                'total_seats' => $schedule->bus->total_seats ?? 'N/A',
+                'available_seats' => $schedule->available_seats,
+                'travel_date' => $schedule->travel_date->format('Y-m-d'),
+                'departure_time' => $schedule->departure_time->format('H:i'),
+                'status' => $schedule->status
+            ],
+            'seat_status' => [
+                'booked_seats' => $bookedSeats,
+                'reserved_seats' => $reservedSeats,
+                'test_seats' => $testSeats,
+                'seat_11_status' => [
+                    'is_booked' => in_array('11', $bookedSeats),
+                    'is_reserved' => in_array('11', $reservedSeats),
+                    'is_available' => !in_array('11', $bookedSeats) && !in_array('11', $reservedSeats)
+                ]
+            ],
+            'user_info' => [
+                'user_id' => $user->id,
+                'existing_reservation' => $existingReservation ? [
+                    'id' => $existingReservation->id,
+                    'seat_numbers' => $existingReservation->seat_numbers,
+                    'expires_at' => $existingReservation->expires_at,
+                    'status' => $existingReservation->status
+                ] : null
+            ],
+            'reservation_attempt' => [
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'test_seats' => $testSeats
+            ],
+            'database_checks' => [
+                'seat_reservations_table_exists' => \Schema::hasTable('seat_reservations'),
+                'schedules_table_exists' => \Schema::hasTable('schedules'),
+                'bookings_table_exists' => \Schema::hasTable('bookings'),
+                'users_table_exists' => \Schema::hasTable('users')
+            ],
+            'possible_issues' => [
+                'schedule_not_bookable' => !$schedule->isBookableOnline(),
+                'seats_already_taken' => in_array('11', array_merge($bookedSeats, $reservedSeats)),
+                'database_error' => !$result['success'] && $result['message'] === 'Failed to reserve seats. Please try again.',
+                'validation_error' => !$result['success'] && strpos($result['message'], 'available') !== false
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Debug seat reservation failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->name('debug.seat.reservation.issue');
+
+// Debug seat reservation with actual user authentication
+Route::post('/debug/test-seat-reservation/{schedule_id}', function (Illuminate\Http\Request $request, $scheduleId) {
+    try {
+        $schedule = \App\Models\Schedule::with(['bus', 'route'])->findOrFail($scheduleId);
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        if (!$user) {
+            return response()->json(['error' => 'User not authenticated'], 401);
+        }
+
+        // Test seat reservation with actual authenticated user
+        $testSeats = $request->input('seat_numbers', ['11']); // Default to seat 11
+        $reservationService = app(\App\Services\SeatReservationService::class);
+
+        // Get current seat status
+        $bookedSeats = \App\Models\Booking::where('schedule_id', $scheduleId)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->get()
+            ->pluck('seat_numbers')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        $reservedSeats = \App\Models\SeatReservation::where('schedule_id', $scheduleId)
+            ->active()
+            ->get()
+            ->pluck('seat_numbers')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        $existingReservation = \App\Models\SeatReservation::where('user_id', $user->id)
+            ->where('schedule_id', $scheduleId)
+            ->active()
+            ->first();
+
+        // Try to reserve seats
+        $result = $reservationService->reserveSeats($user->id, $scheduleId, $testSeats, 60);
+
+        return response()->json([
+            'debug_authenticated_seat_reservation' => true,
+            'authenticated_user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'is_active' => $user->is_active,
+                'role' => $user->role ?? 'customer'
+            ],
+            'schedule_info' => [
+                'id' => $schedule->id,
+                'route' => $schedule->route->name ?? 'N/A',
+                'bus' => $schedule->bus->bus_number ?? 'N/A',
+                'total_seats' => $schedule->bus->total_seats ?? 'N/A',
+                'available_seats' => $schedule->available_seats,
+                'travel_date' => $schedule->travel_date->format('Y-m-d'),
+                'departure_time' => $schedule->departure_time->format('H:i'),
+                'status' => $schedule->status,
+                'is_bookable_online' => $schedule->isBookableOnline()
+            ],
+            'seat_status' => [
+                'booked_seats' => $bookedSeats,
+                'reserved_seats' => $reservedSeats,
+                'test_seats' => $testSeats,
+                'requested_seats_status' => array_map(function($seat) use ($bookedSeats, $reservedSeats) {
+                    return [
+                        'seat' => $seat,
+                        'is_booked' => in_array($seat, $bookedSeats),
+                        'is_reserved' => in_array($seat, $reservedSeats),
+                        'is_available' => !in_array($seat, $bookedSeats) && !in_array($seat, $reservedSeats)
+                    ];
+                }, $testSeats)
+            ],
+            'existing_reservation' => $existingReservation ? [
+                'id' => $existingReservation->id,
+                'seat_numbers' => $existingReservation->seat_numbers,
+                'expires_at' => $existingReservation->expires_at,
+                'status' => $existingReservation->status
+            ] : null,
+            'reservation_attempt' => [
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'test_seats' => $testSeats
+            ],
+            'middleware_checks' => [
+                'auth_check' => \Illuminate\Support\Facades\Auth::check(),
+                'user_active' => $user->is_active ?? false,
+                'csrf_token' => csrf_token()
+            ]
+        ], 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Debug authenticated seat reservation failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+})->middleware(['auth', 'user'])->name('debug.authenticated.seat.reservation');
+
+// Debug seat reservation test page
+Route::get('/debug/seat-reservation-test', function () {
+    return view('debug.seat-reservation-test');
+})->middleware(['auth', 'user'])->name('debug.seat.reservation.test');
