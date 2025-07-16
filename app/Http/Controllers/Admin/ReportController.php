@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -216,22 +217,152 @@ class ReportController extends Controller
     }
 
     /**
-     * Export booking reports to Excel/CSV.
+     * Export booking reports to PDF.
      */
     public function exportBookings(Request $request)
     {
-        // Implementation for exporting bookings
-        // This would typically use a package like Laravel Excel
-        return response()->json(['message' => 'Export functionality will be implemented']);
+        try {
+            $dateFrom = $request->get('date_from', Carbon::now()->startOfMonth()->format('Y-m-d'));
+            $dateTo = $request->get('date_to', Carbon::now()->endOfMonth()->format('Y-m-d'));
+            $operator = $request->get('operator');
+            $status = $request->get('status');
+
+            \Log::info('Admin booking export started', [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'operator' => $operator,
+                'status' => $status
+            ]);
+
+            $query = Booking::with(['user', 'schedule.route.sourceCity', 'schedule.route.destinationCity', 'schedule.bus', 'schedule.operator'])
+                ->whereBetween('created_at', [$dateFrom, $dateTo]);
+
+            if ($operator) {
+                $query->whereHas('schedule', function($q) use ($operator) {
+                    $q->where('operator_id', $operator);
+                });
+            }
+
+            if ($status) {
+                $query->where('status', $status);
+            }
+
+            $bookings = $query->orderBy('created_at', 'desc')->get();
+
+            \Log::info('Bookings retrieved for admin export', [
+                'booking_count' => $bookings->count()
+            ]);
+
+            // Generate PDF
+            $pdf = PDF::loadView('admin.reports.export-bookings-pdf', [
+                'bookings' => $bookings,
+                'filters' => [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'operator' => $operator,
+                    'status' => $status
+                ],
+                'exportDate' => now(),
+                'summary' => [
+                    'total_bookings' => $bookings->count(),
+                    'confirmed_bookings' => $bookings->where('status', 'confirmed')->count(),
+                    'cancelled_bookings' => $bookings->where('status', 'cancelled')->count(),
+                    'total_revenue' => $bookings->where('status', 'confirmed')->sum('total_amount'),
+                ]
+            ]);
+
+            $filename = 'admin_bookings_export_' . $dateFrom . '_to_' . $dateTo . '_' . now()->format('Y_m_d_H_i_s') . '.pdf';
+
+            \Log::info('Admin booking export completed', [
+                'filename' => $filename,
+                'bookings_exported' => $bookings->count()
+            ]);
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            \Log::error('Admin booking export failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Failed to export booking reports. Please try again.');
+        }
     }
 
     /**
-     * Export revenue reports to Excel/CSV.
+     * Export revenue reports to PDF.
      */
     public function exportRevenue(Request $request)
     {
-        // Implementation for exporting revenue data
-        return response()->json(['message' => 'Export functionality will be implemented']);
+        try {
+            $period = $request->get('period', 'month');
+            $year = $request->get('year', Carbon::now()->year);
+            $month = $request->get('month', Carbon::now()->month);
+
+            \Log::info('Admin revenue export started', [
+                'period' => $period,
+                'year' => $year,
+                'month' => $month
+            ]);
+
+            // Get revenue data based on period
+            $query = Booking::where('status', 'confirmed');
+
+            if ($period === 'month') {
+                $query->whereYear('created_at', $year)
+                      ->whereMonth('created_at', $month);
+            } else {
+                $query->whereYear('created_at', $year);
+            }
+
+            $bookings = $query->with(['schedule.operator', 'schedule.route.sourceCity', 'schedule.route.destinationCity'])
+                             ->orderBy('created_at', 'desc')
+                             ->get();
+
+            // Revenue by operator
+            $operatorRevenue = $bookings->groupBy('schedule.operator.company_name')
+                                      ->map(function($operatorBookings) {
+                                          return [
+                                              'bookings' => $operatorBookings->count(),
+                                              'revenue' => $operatorBookings->sum('total_amount')
+                                          ];
+                                      })
+                                      ->sortByDesc('revenue');
+
+            // Generate PDF
+            $pdf = PDF::loadView('admin.reports.export-revenue-pdf', [
+                'bookings' => $bookings,
+                'operatorRevenue' => $operatorRevenue,
+                'period' => $period,
+                'year' => $year,
+                'month' => $month,
+                'exportDate' => now(),
+                'summary' => [
+                    'total_revenue' => $bookings->sum('total_amount'),
+                    'total_bookings' => $bookings->count(),
+                    'average_booking_value' => $bookings->count() > 0 ? $bookings->sum('total_amount') / $bookings->count() : 0,
+                    'top_operator' => $operatorRevenue->first()
+                ]
+            ]);
+
+            $filename = 'admin_revenue_export_' . $period . '_' . $year . ($period === 'month' ? '_' . $month : '') . '_' . now()->format('Y_m_d_H_i_s') . '.pdf';
+
+            \Log::info('Admin revenue export completed', [
+                'filename' => $filename,
+                'total_revenue' => $bookings->sum('total_amount')
+            ]);
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            \Log::error('Admin revenue export failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Failed to export revenue reports. Please try again.');
+        }
     }
 
     /**

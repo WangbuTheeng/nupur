@@ -92,10 +92,94 @@
                     <!-- Right side -->
                     <div class="flex items-center space-x-4">
                         <!-- Notifications -->
-                        <button class="relative p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition duration-150 ease-in-out">
-                            <i class="fas fa-bell text-lg"></i>
-                            <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
-                        </button>
+                        <div class="relative" x-data="adminNotificationDropdown()" x-init="init()">
+                            <button @click="toggleDropdown()" class="relative p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition duration-150 ease-in-out">
+                                <i class="fas fa-bell text-lg"></i>
+                                <span x-show="unreadCount > 0" x-text="unreadCount > 99 ? '99+' : unreadCount"
+                                      class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[18px] h-[18px]"></span>
+                            </button>
+
+                            <!-- Notification Dropdown -->
+                            <div x-show="open"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 scale-95"
+                                 x-transition:enter-end="opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="opacity-100 scale-100"
+                                 x-transition:leave-end="opacity-0 scale-95"
+                                 @click.away="open = false"
+                                 class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+
+                                <!-- Header -->
+                                <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                    <h3 class="text-sm font-medium text-gray-900">Notifications</h3>
+                                    <div class="flex space-x-2">
+                                        <button @click="markAllAsRead()"
+                                                x-show="unreadCount > 0"
+                                                class="text-xs text-blue-600 hover:text-blue-800">
+                                            Mark all read
+                                        </button>
+                                        <button @click="createTestNotification()"
+                                                class="text-xs text-green-600 hover:text-green-800">
+                                            Test
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Notifications List -->
+                                <div class="max-h-96 overflow-y-auto">
+                                    <template x-if="loading">
+                                        <div class="px-4 py-8 text-center">
+                                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                                            <p class="text-sm text-gray-500 mt-2">Loading notifications...</p>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="!loading && notifications.length === 0">
+                                        <div class="px-4 py-8 text-center">
+                                            <i class="fas fa-bell-slash text-gray-400 text-2xl"></i>
+                                            <p class="text-sm text-gray-500 mt-2">No notifications</p>
+                                        </div>
+                                    </template>
+
+                                    <template x-for="notification in notifications" :key="notification.id">
+                                        <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                                             :class="{ 'bg-blue-50': !notification.read_at }"
+                                             @click="markAsRead(notification)">
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-sm font-medium text-gray-900" x-text="notification.title"></p>
+                                                    <p class="text-sm text-gray-600 mt-1" x-text="notification.message"></p>
+                                                    <p class="text-xs text-gray-400 mt-1" x-text="formatTime(notification.created_at)"></p>
+                                                </div>
+                                                <div class="flex items-center space-x-2 ml-2">
+                                                    <template x-if="!notification.read_at">
+                                                        <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                                    </template>
+                                                    <button @click.stop="deleteNotification(notification)"
+                                                            class="text-gray-400 hover:text-red-500">
+                                                        <i class="fas fa-times text-xs"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <template x-if="notification.action_url">
+                                                <a :href="notification.action_url"
+                                                   class="inline-block mt-2 text-xs text-blue-600 hover:text-blue-800"
+                                                   x-text="notification.action_text || 'View'"></a>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <!-- Footer -->
+                                <div class="px-4 py-3 border-t border-gray-200">
+                                    <a href="{{ route('admin.notifications.index') }}"
+                                       class="text-sm text-blue-600 hover:text-blue-800">
+                                        View all notifications
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
@@ -232,5 +316,173 @@
     </div>
 
     @stack('scripts')
+
+    <script>
+        function adminNotificationDropdown() {
+            return {
+                open: false,
+                loading: false,
+                notifications: [],
+                unreadCount: 0,
+
+                init() {
+                    this.loadNotifications();
+                    this.loadUnreadCount();
+                    // Refresh notifications every 30 seconds
+                    setInterval(() => {
+                        this.loadUnreadCount();
+                        if (this.open) {
+                            this.loadNotifications();
+                        }
+                    }, 30000);
+                },
+
+                toggleDropdown() {
+                    this.open = !this.open;
+                    if (this.open) {
+                        this.loadNotifications();
+                    }
+                },
+
+                async loadNotifications() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/admin/notifications/unread', {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+                        const data = await response.json();
+                        this.notifications = data.notifications;
+                        this.unreadCount = data.unread_count;
+                    } catch (error) {
+                        console.error('Error loading notifications:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadUnreadCount() {
+                    try {
+                        const response = await fetch('/admin/notifications/unread-count', {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+                        const data = await response.json();
+                        this.unreadCount = data.unread_count;
+                    } catch (error) {
+                        console.error('Error loading unread count:', error);
+                    }
+                },
+
+                async markAsRead(notification) {
+                    if (notification.read_at) return;
+
+                    try {
+                        const response = await fetch(`/admin/notifications/${notification.id}/mark-as-read`, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            notification.read_at = new Date().toISOString();
+                            this.unreadCount = data.unread_count;
+
+                            // Navigate to action URL if available
+                            if (notification.action_url) {
+                                window.location.href = notification.action_url;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error marking notification as read:', error);
+                    }
+                },
+
+                async markAllAsRead() {
+                    try {
+                        const response = await fetch('/admin/notifications/mark-all-as-read', {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.notifications.forEach(notification => {
+                                notification.read_at = new Date().toISOString();
+                            });
+                            this.unreadCount = 0;
+                        }
+                    } catch (error) {
+                        console.error('Error marking all notifications as read:', error);
+                    }
+                },
+
+                async deleteNotification(notification) {
+                    try {
+                        const response = await fetch(`/admin/notifications/${notification.id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.notifications = this.notifications.filter(n => n.id !== notification.id);
+                            this.unreadCount = data.unread_count;
+                        }
+                    } catch (error) {
+                        console.error('Error deleting notification:', error);
+                    }
+                },
+
+                async createTestNotification() {
+                    try {
+                        const response = await fetch('/admin/notifications/create-test', {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.loadNotifications();
+                            this.unreadCount = data.unread_count;
+                        }
+                    } catch (error) {
+                        console.error('Error creating test notification:', error);
+                    }
+                },
+
+                formatTime(dateString) {
+                    const date = new Date(dateString);
+                    const now = new Date();
+                    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+
+                    if (diffInMinutes < 1) return 'Just now';
+                    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+                    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+                    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+                }
+            }
+        }
+    </script>
 </body>
 </html>

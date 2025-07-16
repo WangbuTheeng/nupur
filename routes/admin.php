@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ScheduleController;
 use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SystemController;
+use App\Http\Controllers\Admin\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -81,7 +82,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('export/revenue', [ReportController::class, 'exportRevenue'])->name('export.revenue');
         Route::get('export/operators', [ReportController::class, 'exportOperators'])->name('export.operators');
     });
-    
+
+    // Notifications
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread', [NotificationController::class, 'unread'])->name('unread');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::post('/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('mark-as-read');
+        Route::post('/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-as-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+        Route::post('/create-test', [NotificationController::class, 'createTest'])->name('create-test');
+        Route::get('/test-page', [NotificationController::class, 'testPage'])->name('test-page');
+    });
+
     // System Settings & Configuration
     Route::prefix('system')->name('system.')->group(function () {
         Route::get('settings', [SystemController::class, 'settings'])->name('settings');

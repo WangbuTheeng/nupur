@@ -94,7 +94,13 @@
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Seat Numbers</dt>
-                        <dd class="text-lg font-semibold text-gray-900">{{ implode(', ', $booking->seat_numbers) }}</dd>
+                        <dd class="text-lg font-semibold text-gray-900">
+                            @if(is_array($booking->seat_numbers))
+                                {{ implode(', ', $booking->seat_numbers) }}
+                            @else
+                                {{ $booking->seat_numbers ?? 'N/A' }}
+                            @endif
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Passengers</dt>
@@ -107,7 +113,7 @@
         <!-- Passenger Details -->
         <div class="px-6 py-6 border-t border-gray-200">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Passenger Information</h3>
-            @if($booking->passenger_details && count($booking->passenger_details) > 0)
+            @if($booking->passenger_details && is_array($booking->passenger_details) && count($booking->passenger_details) > 0)
                 @foreach($booking->passenger_details as $index => $passenger)
                     <div class="bg-gray-50 rounded-lg p-4 {{ $index > 0 ? 'mt-4' : '' }}">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -142,6 +148,10 @@
                         @endif
                     </div>
                 @endforeach
+            @else
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-600">No detailed passenger information available.</p>
+                </div>
             @endif
         </div>
 
